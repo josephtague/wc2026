@@ -1,10 +1,11 @@
 // teletextData.ts — group standings, scorers, narratives, headlines.
 // TypeScript port of teletext-data.js from the design prototype.
 
-import { fakeResult, TZ, formatTime, formatDay } from './dataUtils';
+import { TZ, formatTime, formatDay } from './dataUtils';
+import { resolveScore, isMatchFinished, isMatchLive } from './liveData';
 import type {
   Match, FakeResult, StandingRow, GroupResult,
-  TopScorer, Headline, FullResult, ScorerEntry, TZKey,
+  TopScorer, Headline, FullResult, ScorerEntry, TZKey, LiveScore, NewsItem,
 } from './types';
 
 // ── Player surname pools by nation ─────────────────────────────────────────
@@ -94,8 +95,8 @@ function syntheticAttendance(matchNum: number): number {
 }
 
 // ── Full result with stats ─────────────────────────────────────────────────
-export function fullResult(m: Match): FullResult {
-  const r = fakeResult(m.num);
+export function fullResult(m: Match, liveScores: Map<number, LiveScore> = new Map()): FullResult {
+  const r = resolveScore(m.num, liveScores);
   const home = teamScorers(m.teams[0].name, r.home, m.num);
   const away = teamScorers(m.teams[1].name, r.away, m.num * 7 + 13);
   const possH = 35 + (h32(m.num, 11) % 30);
@@ -140,7 +141,11 @@ export function narrative(m: Match, result: FullResult): string {
 }
 
 // ── Group standings ────────────────────────────────────────────────────────
-export function groupStandings(matches: Match[], nowMs: number): Record<string, StandingRow[]> {
+export function groupStandings(
+  matches: Match[],
+  nowMs: number,
+  liveScores: Map<number, LiveScore> = new Map(),
+): Record<string, StandingRow[]> {
   const groups: Record<string, Record<string, StandingRow>> = {};
   matches.filter(m => m.stageId === 'group').forEach(m => {
     const g = m.group;
@@ -148,8 +153,8 @@ export function groupStandings(matches: Match[], nowMs: number): Record<string, 
     m.teams.forEach(t => {
       if (!groups[g][t.name]) groups[g][t.name] = { name: t.name, short: t.short, p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0 };
     });
-    if (m.kickoffUTC + 110 * 60 * 1000 <= nowMs) {
-      const r: FakeResult = fakeResult(m.num);
+    if (isMatchFinished(m.num, m.kickoffUTC, nowMs, liveScores)) {
+      const r: FakeResult = resolveScore(m.num, liveScores);
       const A = groups[g][m.teams[0].name]!;
       const B = groups[g][m.teams[1].name]!;
       A.p++; B.p++; A.gf += r.home; A.ga += r.away; B.gf += r.away; B.ga += r.home;
@@ -167,18 +172,28 @@ export function groupStandings(matches: Match[], nowMs: number): Record<string, 
 }
 
 // ── Group head-to-head results ─────────────────────────────────────────────
-export function groupResults(matches: Match[], groupName: string, nowMs: number): GroupResult[] {
+export function groupResults(
+  matches: Match[],
+  groupName: string,
+  nowMs: number,
+  liveScores: Map<number, LiveScore> = new Map(),
+): GroupResult[] {
   return matches
     .filter(m => m.group === groupName && m.stageId === 'group')
     .map(m => {
-      const finished = m.kickoffUTC + 110 * 60 * 1000 <= nowMs;
-      const live     = m.kickoffUTC <= nowMs && !finished;
-      return { m, finished, live, score: fakeResult(m.num) };
+      const finished = isMatchFinished(m.num, m.kickoffUTC, nowMs, liveScores);
+      const live     = isMatchLive(m.num, m.kickoffUTC, nowMs, liveScores);
+      return { m, finished, live, score: resolveScore(m.num, liveScores) };
     });
 }
 
 // ── Tournament-wide top scorers ────────────────────────────────────────────
-export function topScorers(matches: Match[], nowMs: number, limit = 8): TopScorer[] {
+export function topScorers(
+  matches: Match[],
+  nowMs: number,
+  limit = 8,
+  liveScores: Map<number, LiveScore> = new Map(),
+): TopScorer[] {
   const tally = new Map<string, TopScorer>();
   const bump = (name: string, team: string) => {
     const k = `${name}|${team}`;
@@ -186,8 +201,8 @@ export function topScorers(matches: Match[], nowMs: number, limit = 8): TopScore
     tally.get(k)!.goals++;
   };
   matches.forEach(m => {
-    if (m.kickoffUTC + 110 * 60 * 1000 > nowMs) return;
-    const r = fullResult(m);
+    if (!isMatchFinished(m.num, m.kickoffUTC, nowMs, liveScores)) return;
+    const r = fullResult(m, liveScores);
     r.scorers.home.forEach(s => bump(s.name, m.teams[0].short));
     r.scorers.away.forEach(s => bump(s.name, m.teams[1].short));
   });
@@ -197,25 +212,43 @@ export function topScorers(matches: Match[], nowMs: number, limit = 8): TopScore
 }
 
 // ── News headlines ─────────────────────────────────────────────────────────
-export function headlines(matches: Match[], nowMs: number, viewer: TZKey): Headline[] {
-  const played   = matches.filter(m => m.kickoffUTC + 110 * 60 * 1000 <= nowMs);
+export function headlines(
+  matches: Match[],
+  nowMs: number,
+  viewer: TZKey,
+  liveScores: Map<number, LiveScore> = new Map(),
+  newsItems: NewsItem[] = [],
+): Headline[] {
+  const played   = matches.filter(m => isMatchFinished(m.num, m.kickoffUTC, nowMs, liveScores));
   const upcoming = matches.filter(m => m.kickoffUTC > nowMs).slice(0, 12);
   const result: Headline[] = [];
 
-  // 1. Most recent decisive result
-  const recent  = played.slice().reverse();
-  const biggest = recent.find(m => Math.abs(fakeResult(m.num).home - fakeResult(m.num).away) >= 2) ?? recent[0];
-  if (biggest) {
-    const r      = fakeResult(biggest.num);
-    const winner = r.home > r.away ? biggest.teams[0] : biggest.teams[1];
-    const loser  = r.home > r.away ? biggest.teams[1] : biggest.teams[0];
-    const margin = Math.abs(r.home - r.away);
+  // 1. Top headline — real BBC news if available, else most decisive recent result
+  if (newsItems.length > 0) {
+    const item = newsItems[0]!;
     result.push({
-      kind: 'result', kicker: 'HEADLINE',
-      title: `${winner.name.toUpperCase()} ${margin >= 3 ? 'ROUT' : 'BEAT'} ${loser.name.toUpperCase()} ${Math.max(r.home,r.away)}-${Math.min(r.home,r.away)}`,
-      body:  `${biggest.city} witnessed ${margin >= 3 ? 'a statement' : 'a steady'} performance from ${winner.name} as they ${margin >= 3 ? 'tore through' : 'edged past'} ${loser.name} in ${biggest.stage.toLowerCase()} action.`,
-      match: biggest,
+      kind: 'news', kicker: 'LATEST NEWS',
+      title: item.title.toUpperCase().slice(0, 72),
+      body:  item.description.slice(0, 180),
     });
+  } else {
+    const recent  = played.slice().reverse();
+    const biggest = recent.find(m => {
+      const r = resolveScore(m.num, liveScores);
+      return Math.abs(r.home - r.away) >= 2;
+    }) ?? recent[0];
+    if (biggest) {
+      const r      = resolveScore(biggest.num, liveScores);
+      const winner = r.home > r.away ? biggest.teams[0] : biggest.teams[1];
+      const loser  = r.home > r.away ? biggest.teams[1] : biggest.teams[0];
+      const margin = Math.abs(r.home - r.away);
+      result.push({
+        kind: 'result', kicker: 'HEADLINE',
+        title: `${winner.name.toUpperCase()} ${margin >= 3 ? 'ROUT' : 'BEAT'} ${loser.name.toUpperCase()} ${Math.max(r.home,r.away)}-${Math.min(r.home,r.away)}`,
+        body:  `${biggest.city} witnessed ${margin >= 3 ? 'a statement' : 'a steady'} performance from ${winner.name} as they ${margin >= 3 ? 'tore through' : 'edged past'} ${loser.name} in ${biggest.stage.toLowerCase()} action.`,
+        match: biggest,
+      });
+    }
   }
 
   // 2. Next big match
@@ -230,13 +263,13 @@ export function headlines(matches: Match[], nowMs: number, viewer: TZKey): Headl
   }
 
   // 3. Tightest group
-  const standings = groupStandings(matches, nowMs);
+  const standings = groupStandings(matches, nowMs, liveScores);
   let tightest: string | null = null, tightestSpread = 99;
-  Object.entries(standings).forEach(([g, rows]) => {
-    if (rows[0]!.p < 2 || rows.length < 4) return;
+  for (const [g, rows] of Object.entries(standings)) {
+    if (rows[0]!.p < 2 || rows.length < 4) continue;
     const spread = rows[0]!.pts - rows[3]!.pts;
     if (spread < tightestSpread) { tightestSpread = spread; tightest = g; }
-  });
+  }
   if (tightest) {
     const rows = standings[tightest]!;
     result.push({
@@ -248,7 +281,7 @@ export function headlines(matches: Match[], nowMs: number, viewer: TZKey): Headl
   }
 
   // 4. Golden Boot leader
-  const scorers = topScorers(matches, nowMs, 1);
+  const scorers = topScorers(matches, nowMs, 1, liveScores);
   if (scorers.length) {
     const s = scorers[0]!;
     result.push({

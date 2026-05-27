@@ -1,12 +1,17 @@
 // TeletextApp.tsx — TV chassis, remote control, page router, keyboard handling
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { loadMatches, defaultNow, TZ, TZ_ORDER } from '../lib/dataUtils';
-import type { Match, TZKey, PageId, PageConfig } from '../lib/types';
+import { fetchLiveScores, fetchNewsHeadlines } from '../lib/liveData';
+import type { Match, TZKey, PageId, PageConfig, LiveScore, NewsItem } from '../lib/types';
 import {
   NewsPage, FixturesPage, ResultsPage,
   GroupsPage, GroupDetailPage, MatchReviewPage,
 } from './TeletextViews';
 import { groupStandings } from '../lib/teletextData';
+
+// Demo mode — add ?demo=1 to the URL to simulate mid-group-stage state.
+// Without it, the app uses the real clock (correct behaviour from June 11 onwards).
+const isDemoMode = new URLSearchParams(window.location.search).get('demo') === '1';
 
 // ── Page registry ──────────────────────────────────────────────────────────
 const PAGES: Record<string, PageConfig> = {
@@ -30,7 +35,7 @@ export default function TeletextApp() {
   const [matches,          setMatches]          = useState<Match[] | null>(null);
   const [pageId,           setPageId]           = useState<PageId>('news');
   const [tuning,           setTuning]           = useState(false);
-  const [now,              setNow]              = useState(defaultNow);
+  const [now,              setNow]              = useState<number>(() => isDemoMode ? defaultNow() : Date.now());
   const [viewer,           setViewer]           = useState<TZKey>('LDN');  // default London
   const [fixturesPage,     setFixturesPage]     = useState(0);
   const [resultsPage,      setResultsPage]      = useState(0);
@@ -38,10 +43,31 @@ export default function TeletextApp() {
   const [selectedMatchNum, setSelectedMatchNum] = useState<number | null>(null);
   const [clockTick,        setClockTick]        = useState(0);
   const [typed,            setTyped]            = useState('');
+  const [liveScores,       setLiveScores]       = useState<Map<number, LiveScore>>(new Map());
+  const [newsItems,        setNewsItems]        = useState<NewsItem[]>([]);
   const stageRef = useRef<HTMLDivElement>(null);
 
-  // Load matches
-  useEffect(() => { loadMatches().then(setMatches); }, []);
+  // Load matches, then immediately kick off a live-score fetch
+  useEffect(() => {
+    loadMatches().then(m => {
+      setMatches(m);
+      fetchLiveScores(m).then(setLiveScores);
+    });
+  }, []);
+
+  // Poll live scores every 5 min (pauses itself when no matches loaded)
+  useEffect(() => {
+    if (!matches) return;
+    const id = setInterval(() => fetchLiveScores(matches).then(setLiveScores), 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [matches]);
+
+  // Fetch + poll news headlines every 15 min
+  useEffect(() => {
+    fetchNewsHeadlines().then(setNewsItems);
+    const id = setInterval(() => fetchNewsHeadlines().then(setNewsItems), 15 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Tick clock every second
   useEffect(() => {
@@ -49,9 +75,12 @@ export default function TeletextApp() {
     return () => clearInterval(id);
   }, []);
 
-  // Tick "now" so countdowns/live indicators advance
+  // Advance "now" every second — demo mode simulates time, real mode stays in sync with Date.now()
   useEffect(() => {
-    const id = setInterval(() => setNow(n => n + 1000), 1000);
+    const id = setInterval(() => {
+      if (isDemoMode) setNow(n => n + 1000);
+      else            setNow(Date.now());
+    }, 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -116,6 +145,7 @@ export default function TeletextApp() {
   const pageProps = {
     matches: matches ?? [],
     now, viewer,
+    liveScores, newsItems,
     switchPage,
     focusedGroup, setFocusedGroup,
     selectedMatchNum, setSelectedMatchNum,
@@ -134,7 +164,7 @@ export default function TeletextApp() {
                   <div className="tt">
                     <StatusBar page={page} clockTick={clockTick} viewer={viewer} setViewer={setViewer} />
                     <Masthead page={page} />
-                    <SubHeader pageId={pageId} matches={matches} now={now} focusedGroup={focusedGroup} viewer={viewer} />
+                    <SubHeader pageId={pageId} matches={matches} now={now} focusedGroup={focusedGroup} viewer={viewer} liveScores={liveScores} />
 
                     {/* Page content */}
                     {pageId === 'news'     && <NewsPage     {...pageProps} />}
@@ -196,6 +226,7 @@ function StatusBar({ page, clockTick: _tick, viewer, setViewer }: {
         ))}
       </span>
       <span className="when">
+        {isDemoMode && <span className="c-r" style={{ marginRight: 6, fontSize: 16, letterSpacing: 1 }}>DEMO</span>}
         <span className="c-w">{wk} {pad(d.getDate())} {mo} </span>
         <span className="clock">{pad(d.getHours())}:{pad(d.getMinutes())}/{pad(d.getSeconds())}</span>
       </span>
@@ -217,8 +248,9 @@ function Masthead({ page }: { page: PageConfig }) {
 }
 
 // ─── Sub-header ────────────────────────────────────────────────────────────
-function SubHeader({ pageId, matches, now, focusedGroup, viewer }: {
+function SubHeader({ pageId, matches, now, focusedGroup, viewer, liveScores }: {
   pageId: PageId; matches: Match[]; now: number; focusedGroup: string; viewer: TZKey;
+  liveScores: Map<number, LiveScore>;
 }) {
   const t = TZ[viewer]?.code ?? '';
   let node: React.ReactNode = null;
@@ -226,7 +258,7 @@ function SubHeader({ pageId, matches, now, focusedGroup, viewer }: {
   if (pageId === 'fixtures') node = <><span className="em">— UPCOMING —</span> KICK-OFF TIMES SHOWN IN {t}</>;
   if (pageId === 'results')  node = <><span className="em">— FINAL SCORES —</span> MOST RECENT FIRST</>;
   if (pageId === 'groups') {
-    const count = Object.keys(groupStandings(matches, now)).length;
+    const count = Object.keys(groupStandings(matches, now, liveScores)).length;
     node = <>{count} GROUPS <span className="em">·</span> 48 NATIONS <span className="em">·</span> TOP 2 ADVANCE</>;
   }
   if (pageId === 'groupdet') node = <>{focusedGroup.toUpperCase()} <span className="em">· FULL TABLE · MATCH-BY-MATCH</span></>;

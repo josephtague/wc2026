@@ -125,6 +125,28 @@ export interface Headline {
 
 export type PageId = 'news' | 'fixtures' | 'results' | 'groups' | 'groupdet' | 'review';
 
+// ── Live data ──────────────────────────────────────────────────────────────
+// football-data.org status values (plus a few extras for safety)
+export type MatchStatus =
+  | 'SCHEDULED' | 'TIMED'
+  | 'IN_PLAY'   | 'PAUSED'
+  | 'FINISHED'
+  | 'POSTPONED' | 'CANCELLED' | 'SUSPENDED';
+
+export interface LiveScore {
+  home:    number;
+  away:    number;
+  status:  MatchStatus;
+  minute?: number;       // populated during IN_PLAY / PAUSED
+}
+
+export interface NewsItem {
+  title:       string;
+  description: string;
+  link:        string;
+  pubDate:     string;
+}
+
 export interface FastextItem {
   c: 'r' | 'g' | 'y' | 'c';
   label: string;

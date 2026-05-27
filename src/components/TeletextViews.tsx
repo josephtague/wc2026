@@ -1,17 +1,20 @@
 // TeletextViews.tsx — P100 News · P140 Fixtures · P141 Results · P150 Groups · P151 Group Detail · P160 Match Review
 import { useMemo, useState } from 'react';
 import {
-  fakeResult, formatTime, formatDay, formatDayShort,
+  formatTime, formatDay, formatDayShort,
   inTz, sleepScore, SLEEP_QUIP, WK, MO,
 } from '../lib/dataUtils';
+import { resolveScore, isMatchFinished, isMatchLive } from '../lib/liveData';
 import { fullResult, narrative, groupStandings, groupResults, topScorers, headlines } from '../lib/teletextData';
-import type { Match, TZKey, PageId } from '../lib/types';
+import type { Match, TZKey, PageId, LiveScore, NewsItem } from '../lib/types';
 
 // ── Shared props types ─────────────────────────────────────────────────────
 interface BaseProps {
   matches: Match[];
   now: number;
   viewer: TZKey;
+  liveScores: Map<number, LiveScore>;
+  newsItems: NewsItem[];
   switchPage: (id: PageId) => void;
   setSelectedMatchNum: (n: number) => void;
   setFocusedGroup: (g: string) => void;
@@ -21,9 +24,9 @@ interface BaseProps {
 // ─────────────────────────────────────────────────────────────────────
 // P100  NEWS HEADLINES
 // ─────────────────────────────────────────────────────────────────────
-export function NewsPage({ matches, now, viewer, switchPage, setSelectedMatchNum, setFocusedGroup }: BaseProps) {
-  const hl      = useMemo(() => headlines(matches, now, viewer), [matches, now, viewer]);
-  const scorers = useMemo(() => topScorers(matches, now, 6),      [matches, now]);
+export function NewsPage({ matches, now, viewer, liveScores, newsItems, switchPage, setSelectedMatchNum, setFocusedGroup }: BaseProps) {
+  const hl      = useMemo(() => headlines(matches, now, viewer, liveScores, newsItems), [matches, now, viewer, liveScores, newsItems]);
+  const scorers = useMemo(() => topScorers(matches, now, 6, liveScores), [matches, now, liveScores]);
   const nextMatch = useMemo(() => matches.find(m => m.kickoffUTC > now), [matches, now]);
 
   const trim = (s: string, n: number) => s.length <= n ? s : s.slice(0, n - 1).replace(/\s\S*$/, '') + '…';
@@ -113,30 +116,37 @@ interface PaginatedProps extends BaseProps {
   setPage: (fn: (p: number) => number) => void;
 }
 
-export function FixturesPage({ matches, now, viewer, page, setPage }: PaginatedProps) {
-  const upcoming = useMemo(() => matches.filter(m => m.kickoffUTC + 110 * 60 * 1000 > now), [matches, now]);
-  return <FixturesOrResults rows={upcoming} viewer={viewer} page={page} setPage={setPage} showResults={false} showSleep now={now} />;
+export function FixturesPage({ matches, now, viewer, liveScores, page, setPage }: PaginatedProps) {
+  const upcoming = useMemo(
+    () => matches.filter(m => !isMatchFinished(m.num, m.kickoffUTC, now, liveScores)),
+    [matches, now, liveScores],
+  );
+  return <FixturesOrResults rows={upcoming} viewer={viewer} liveScores={liveScores} page={page} setPage={setPage} showResults={false} showSleep now={now} />;
 }
 
 // ─────────────────────────────────────────────────────────────────────
 // P141  RESULTS
 // ─────────────────────────────────────────────────────────────────────
-export function ResultsPage({ matches, now, viewer, page, setPage }: PaginatedProps) {
-  const played = useMemo(() => matches.filter(m => m.kickoffUTC + 110 * 60 * 1000 <= now).slice().reverse(), [matches, now]);
-  return <FixturesOrResults rows={played} viewer={viewer} page={page} setPage={setPage} showResults showSleep={false} now={now} />;
+export function ResultsPage({ matches, now, viewer, liveScores, page, setPage }: PaginatedProps) {
+  const played = useMemo(
+    () => matches.filter(m => isMatchFinished(m.num, m.kickoffUTC, now, liveScores)).slice().reverse(),
+    [matches, now, liveScores],
+  );
+  return <FixturesOrResults rows={played} viewer={viewer} liveScores={liveScores} page={page} setPage={setPage} showResults showSleep={false} now={now} />;
 }
 
 // Shared list renderer
 interface FORProps {
   rows: Match[];
   viewer: TZKey;
+  liveScores: Map<number, LiveScore>;
   page: number;
   setPage: (fn: (p: number) => number) => void;
   showResults: boolean;
   showSleep: boolean;
   now: number;
 }
-function FixturesOrResults({ rows, viewer, page, setPage, showResults, showSleep, now }: FORProps) {
+function FixturesOrResults({ rows, viewer, liveScores, page, setPage, showResults, showSleep, now }: FORProps) {
   const days = useMemo(() => {
     const map = new Map<string, { key: string; label: string; matches: Match[] }>();
     rows.forEach(m => {
@@ -160,12 +170,12 @@ function FixturesOrResults({ rows, viewer, page, setPage, showResults, showSleep
   const colB = visible.slice(3, 6);
 
   const renderRow = (m: Match) => {
-    const t        = formatTime(m.kickoffUTC, viewer);
-    const finished = m.kickoffUTC + 110 * 60 * 1000 <= now;
-    const live     = m.kickoffUTC <= now && !finished;
+    const t          = formatTime(m.kickoffUTC, viewer);
+    const finished   = isMatchFinished(m.num, m.kickoffUTC, now, liveScores);
+    const live       = isMatchLive(m.num, m.kickoffUTC, now, liveScores);
     const stageShort = m.stageId === 'group' ? m.group.replace('Group ', 'GP ') : m.stageShort;
     if (showResults && finished) {
-      const r = fakeResult(m.num);
+      const r = resolveScore(m.num, liveScores);
       return (
         <div className="fix__row is-result" key={m.num}>
           <span className="t">{t}</span>
@@ -227,11 +237,11 @@ function SleepDot({ s }: { s: number }) {
 // ─────────────────────────────────────────────────────────────────────
 // P150  GROUP TABLES
 // ─────────────────────────────────────────────────────────────────────
-export function GroupsPage({ matches, now, focusedGroup, setFocusedGroup, switchPage }: BaseProps) {
-  const standings    = useMemo(() => groupStandings(matches, now), [matches, now]);
+export function GroupsPage({ matches, now, liveScores, focusedGroup, setFocusedGroup, switchPage }: BaseProps) {
+  const standings    = useMemo(() => groupStandings(matches, now, liveScores), [matches, now, liveScores]);
   const groupNames   = Object.keys(standings);
   const focus        = focusedGroup || groupNames[0] || 'Group A';
-  const focusResults = useMemo(() => groupResults(matches, focus, now), [matches, focus, now]);
+  const focusResults = useMemo(() => groupResults(matches, focus, now, liveScores), [matches, focus, now, liveScores]);
 
   return (
     <div className="tt__body">
@@ -297,10 +307,10 @@ export function GroupsPage({ matches, now, focusedGroup, setFocusedGroup, switch
 // ─────────────────────────────────────────────────────────────────────
 // P151  GROUP DETAIL
 // ─────────────────────────────────────────────────────────────────────
-export function GroupDetailPage({ matches, now, viewer, focusedGroup, setSelectedMatchNum, switchPage }: BaseProps) {
+export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup, setSelectedMatchNum, switchPage }: BaseProps) {
   const g        = focusedGroup || 'Group A';
-  const standings = useMemo(() => groupStandings(matches, now)[g] ?? [], [matches, now, g]);
-  const fixtures  = useMemo(() => groupResults(matches, g, now), [matches, g, now]);
+  const standings = useMemo(() => groupStandings(matches, now, liveScores)[g] ?? [], [matches, now, liveScores, g]);
+  const fixtures  = useMemo(() => groupResults(matches, g, now, liveScores), [matches, g, now, liveScores]);
   const letter    = g.replace('Group ', '');
 
   return (
@@ -365,8 +375,8 @@ interface ReviewProps extends BaseProps {
   selectedMatchNum: number | null;
 }
 
-export function MatchReviewPage({ matches, now, viewer, selectedMatchNum, setSelectedMatchNum }: ReviewProps) {
-  const played  = useMemo(() => matches.filter(m => m.kickoffUTC + 110 * 60 * 1000 <= now), [matches, now]);
+export function MatchReviewPage({ matches, now, viewer, liveScores, selectedMatchNum, setSelectedMatchNum }: ReviewProps) {
+  const played  = useMemo(() => matches.filter(m => isMatchFinished(m.num, m.kickoffUTC, now, liveScores)), [matches, now, liveScores]);
   const recent5 = played.slice(-5).reverse();
 
   const match = useMemo(() => {
@@ -382,7 +392,7 @@ export function MatchReviewPage({ matches, now, viewer, selectedMatchNum, setSel
     );
   }
 
-  const r    = fullResult(match);
+  const r    = fullResult(match, liveScores);
   const blurb = narrative(match, r);
   const day  = formatDay(match.kickoffUTC, viewer);
   const time = formatTime(match.kickoffUTC, viewer);
@@ -439,7 +449,7 @@ export function MatchReviewPage({ matches, now, viewer, selectedMatchNum, setSel
 
         <div className="mr__picker">
           {recent5.map(m => {
-            const rr = fakeResult(m.num);
+            const rr = resolveScore(m.num, liveScores);
             const on = m.num === match.num;
             return (
               <button key={m.num} className={`mr__pickbtn${on ? ' on' : ''}`}
