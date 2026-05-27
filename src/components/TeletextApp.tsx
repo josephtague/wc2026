@@ -1,6 +1,6 @@
 // TeletextApp.tsx — TV chassis, remote control, page router, keyboard handling
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { loadMatches, defaultNow, TZ, TZ_ORDER } from '../lib/dataUtils';
+import { loadMatches, TZ, TZ_ORDER } from '../lib/dataUtils';
 import { fetchLiveScores, fetchNewsHeadlines } from '../lib/liveData';
 import type { Match, TZKey, PageId, PageConfig, LiveScore, NewsItem } from '../lib/types';
 import {
@@ -8,10 +8,6 @@ import {
   GroupsPage, GroupDetailPage, MatchReviewPage,
 } from './TeletextViews';
 import { groupStandings } from '../lib/teletextData';
-
-// Demo mode — add ?demo=1 to the URL to simulate mid-group-stage state.
-// Without it, the app uses the real clock (correct behaviour from June 11 onwards).
-const isDemoMode = new URLSearchParams(window.location.search).get('demo') === '1';
 
 // ── Page registry ──────────────────────────────────────────────────────────
 const PAGES: Record<string, PageConfig> = {
@@ -35,7 +31,7 @@ export default function TeletextApp() {
   const [matches,          setMatches]          = useState<Match[] | null>(null);
   const [pageId,           setPageId]           = useState<PageId>('news');
   const [tuning,           setTuning]           = useState(false);
-  const [now,              setNow]              = useState<number>(() => isDemoMode ? defaultNow() : Date.now());
+  const [now,              setNow]              = useState<number>(Date.now);
   const [viewer,           setViewer]           = useState<TZKey>('LDN');  // default London
   const [fixturesPage,     setFixturesPage]     = useState(0);
   const [resultsPage,      setResultsPage]      = useState(0);
@@ -47,18 +43,17 @@ export default function TeletextApp() {
   const [newsItems,        setNewsItems]        = useState<NewsItem[]>([]);
   const stageRef = useRef<HTMLDivElement>(null);
 
-  // Load matches, then kick off a live-score fetch (skipped in demo mode —
-  // demo uses deterministic fake data anchored to the simulated date)
+  // Load matches then immediately fetch live scores
   useEffect(() => {
     loadMatches().then(m => {
       setMatches(m);
-      if (!isDemoMode) fetchLiveScores(m).then(setLiveScores);
+      fetchLiveScores(m).then(setLiveScores);
     });
   }, []);
 
-  // Poll live scores every 5 min (real mode only)
+  // Poll live scores every 5 min
   useEffect(() => {
-    if (isDemoMode || !matches) return;
+    if (!matches) return;
     const id = setInterval(() => fetchLiveScores(matches).then(setLiveScores), 5 * 60 * 1000);
     return () => clearInterval(id);
   }, [matches]);
@@ -76,12 +71,9 @@ export default function TeletextApp() {
     return () => clearInterval(id);
   }, []);
 
-  // Advance "now" every second — demo mode simulates time, real mode stays in sync with Date.now()
+  // Keep "now" in sync with real time
   useEffect(() => {
-    const id = setInterval(() => {
-      if (isDemoMode) setNow(n => n + 1000);
-      else            setNow(Date.now());
-    }, 1000);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -227,7 +219,6 @@ function StatusBar({ page, clockTick: _tick, viewer, setViewer }: {
         ))}
       </span>
       <span className="when">
-        {isDemoMode && <span className="c-r" style={{ marginRight: 6, fontSize: 16, letterSpacing: 1 }}>DEMO</span>}
         <span className="c-w">{wk} {pad(d.getDate())} {mo} </span>
         <span className="clock">{pad(d.getHours())}:{pad(d.getMinutes())}/{pad(d.getSeconds())}</span>
       </span>

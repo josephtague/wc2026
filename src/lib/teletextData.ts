@@ -4,7 +4,7 @@
 import { TZ, formatTime, formatDay } from './dataUtils';
 import { resolveScore, isMatchFinished, isMatchLive } from './liveData';
 import type {
-  Match, FakeResult, StandingRow, GroupResult,
+  Match, StandingRow, GroupResult,
   TopScorer, Headline, FullResult, ScorerEntry, TZKey, LiveScore, NewsItem,
 } from './types';
 
@@ -96,7 +96,8 @@ function syntheticAttendance(matchNum: number): number {
 
 // ── Full result with stats ─────────────────────────────────────────────────
 export function fullResult(m: Match, liveScores: Map<number, LiveScore> = new Map()): FullResult {
-  const r = resolveScore(m.num, liveScores);
+  // Use real score; fall back to 0-0 only as a null-safety guard (network failure edge case)
+  const r = resolveScore(m.num, liveScores) ?? { home: 0, away: 0 };
   const home = teamScorers(m.teams[0].name, r.home, m.num);
   const away = teamScorers(m.teams[1].name, r.away, m.num * 7 + 13);
   const possH = 35 + (h32(m.num, 11) % 30);
@@ -154,7 +155,8 @@ export function groupStandings(
       if (!groups[g][t.name]) groups[g][t.name] = { name: t.name, short: t.short, p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0 };
     });
     if (isMatchFinished(m.num, m.kickoffUTC, nowMs, liveScores)) {
-      const r: FakeResult = resolveScore(m.num, liveScores);
+      const r = resolveScore(m.num, liveScores);
+      if (!r) return; // no confirmed score — skip rather than fabricate
       const A = groups[g][m.teams[0].name]!;
       const B = groups[g][m.teams[1].name]!;
       A.p++; B.p++; A.gf += r.home; A.ga += r.away; B.gf += r.away; B.ga += r.home;
@@ -235,19 +237,21 @@ export function headlines(
     const recent  = played.slice().reverse();
     const biggest = recent.find(m => {
       const r = resolveScore(m.num, liveScores);
-      return Math.abs(r.home - r.away) >= 2;
+      return r !== null && Math.abs(r.home - r.away) >= 2;
     }) ?? recent[0];
     if (biggest) {
-      const r      = resolveScore(biggest.num, liveScores);
-      const winner = r.home > r.away ? biggest.teams[0] : biggest.teams[1];
-      const loser  = r.home > r.away ? biggest.teams[1] : biggest.teams[0];
-      const margin = Math.abs(r.home - r.away);
-      result.push({
-        kind: 'result', kicker: 'HEADLINE',
-        title: `${winner.name.toUpperCase()} ${margin >= 3 ? 'ROUT' : 'BEAT'} ${loser.name.toUpperCase()} ${Math.max(r.home,r.away)}-${Math.min(r.home,r.away)}`,
-        body:  `${biggest.city} witnessed ${margin >= 3 ? 'a statement' : 'a steady'} performance from ${winner.name} as they ${margin >= 3 ? 'tore through' : 'edged past'} ${loser.name} in ${biggest.stage.toLowerCase()} action.`,
-        match: biggest,
-      });
+      const r = resolveScore(biggest.num, liveScores);
+      if (r) {
+        const winner = r.home > r.away ? biggest.teams[0] : biggest.teams[1];
+        const loser  = r.home > r.away ? biggest.teams[1] : biggest.teams[0];
+        const margin = Math.abs(r.home - r.away);
+        result.push({
+          kind: 'result', kicker: 'HEADLINE',
+          title: `${winner.name.toUpperCase()} ${margin >= 3 ? 'ROUT' : 'BEAT'} ${loser.name.toUpperCase()} ${Math.max(r.home,r.away)}-${Math.min(r.home,r.away)}`,
+          body:  `${biggest.city} witnessed ${margin >= 3 ? 'a statement' : 'a steady'} performance from ${winner.name} as they ${margin >= 3 ? 'tore through' : 'edged past'} ${loser.name} in ${biggest.stage.toLowerCase()} action.`,
+          match: biggest,
+        });
+      }
     }
   }
 

@@ -180,7 +180,7 @@ function FixturesOrResults({ rows, viewer, liveScores, page, setPage, showResult
         <div className="fix__row is-result" key={m.num}>
           <span className="t">{t}</span>
           <span className="home">{m.teams[0].short}</span>
-          <span className="sc">{r.home}-{r.away}</span>
+          <span className="sc">{r ? `${r.home}-${r.away}` : '—'}</span>
           <span className="away">{m.teams[1].short}</span>
           <span className="st">{stageShort}</span>
         </div>
@@ -288,7 +288,7 @@ export function GroupsPage({ matches, now, liveScores, focusedGroup, setFocusedG
           {focusResults.map(({ m, finished, live, score }) => (
             <div key={m.num} className={`grp__h2h__row${finished ? '' : ' pend'}`}>
               <span className="l">{m.teams[0].short}</span>
-              <span className="s">{finished ? `${score.home}-${score.away}` : (live ? 'LIVE' : '— v —')}</span>
+              <span className="s">{finished ? (score ? `${score.home}-${score.away}` : '—') : (live ? 'LIVE' : '— v —')}</span>
               <span className="r">{m.teams[1].short}</span>
             </div>
           ))}
@@ -356,7 +356,7 @@ export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup
               <span className="c-y">{formatTime(m.kickoffUTC, viewer)}</span>
               <span className={finished ? 'c-c' : 'c-w'} style={{ textAlign: 'right' }}>{m.teams[0].short}</span>
               <span className={finished ? 'sc c-y' : 'c-dim'} style={{ textAlign: 'center' }}>
-                {finished ? `${score.home}-${score.away}` : (live ? 'LIVE' : 'v')}
+                {finished ? (score ? `${score.home}-${score.away}` : '—') : (live ? 'LIVE' : 'v')}
               </span>
               <span className={finished ? 'c-c' : 'c-w'}>{m.teams[1].short}</span>
               <span className="c-dim">{m.city}</span>
@@ -449,7 +449,7 @@ export function MatchReviewPage({ matches, now, viewer, liveScores, selectedMatc
 
         <div className="mr__picker">
           {recent5.map(m => {
-            const rr = resolveScore(m.num, liveScores);
+            const rr = resolveScore(m.num, liveScores) ?? { home: 0, away: 0 };
             const on = m.num === match.num;
             return (
               <button key={m.num} className={`mr__pickbtn${on ? ' on' : ''}`}

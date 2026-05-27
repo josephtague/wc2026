@@ -105,7 +105,7 @@ export interface GroupResult {
   m: Match;
   finished: boolean;
   live: boolean;
-  score: FakeResult;
+  score: { home: number; away: number } | null;
 }
 
 export interface TopScorer {

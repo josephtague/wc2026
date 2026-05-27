@@ -1,8 +1,7 @@
 // liveData.ts — live scores (football-data.org) + news headlines (BBC Sport RSS).
-// All functions return empty data gracefully when keys are absent or network fails.
-// The rest of the app treats live data as an optional enhancement over the fake fallback.
+// Score data is real-only: resolveScore returns null when no confirmed result is available.
+// All network functions return empty data gracefully on failure — no fake fallback.
 
-import { fakeResult } from './dataUtils';
 import type { Match, LiveScore, MatchStatus, NewsItem } from './types';
 
 // ── Config ─────────────────────────────────────────────────────────────────
@@ -150,19 +149,19 @@ export async function fetchNewsHeadlines(): Promise<NewsItem[]> {
 
 // ── Score resolver ─────────────────────────────────────────────────────────
 /**
- * Returns the best available score for a match:
- * - Live API data when the match is IN_PLAY, PAUSED, or FINISHED
- * - Deterministic fake score as fallback (keeps the demo looking alive)
+ * Returns the confirmed score from the live API, or null if no real result exists.
+ * Only returns a score when the match is IN_PLAY, PAUSED, or FINISHED.
+ * Never falls back to fake/synthetic data.
  */
 export function resolveScore(
   matchNum: number,
   liveScores: Map<number, LiveScore>
-): { home: number; away: number } {
+): { home: number; away: number } | null {
   const live = liveScores.get(matchNum);
   if (live && (live.status === 'FINISHED' || live.status === 'IN_PLAY' || live.status === 'PAUSED')) {
     return { home: live.home, away: live.away };
   }
-  return fakeResult(matchNum);
+  return null;
 }
 
 // ── Match state helpers ────────────────────────────────────────────────────
