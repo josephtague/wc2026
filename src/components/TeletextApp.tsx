@@ -47,17 +47,18 @@ export default function TeletextApp() {
   const [newsItems,        setNewsItems]        = useState<NewsItem[]>([]);
   const stageRef = useRef<HTMLDivElement>(null);
 
-  // Load matches, then immediately kick off a live-score fetch
+  // Load matches, then kick off a live-score fetch (skipped in demo mode —
+  // demo uses deterministic fake data anchored to the simulated date)
   useEffect(() => {
     loadMatches().then(m => {
       setMatches(m);
-      fetchLiveScores(m).then(setLiveScores);
+      if (!isDemoMode) fetchLiveScores(m).then(setLiveScores);
     });
   }, []);
 
-  // Poll live scores every 5 min (pauses itself when no matches loaded)
+  // Poll live scores every 5 min (real mode only)
   useEffect(() => {
-    if (!matches) return;
+    if (isDemoMode || !matches) return;
     const id = setInterval(() => fetchLiveScores(matches).then(setLiveScores), 5 * 60 * 1000);
     return () => clearInterval(id);
   }, [matches]);

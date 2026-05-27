@@ -6,15 +6,31 @@ import { fakeResult } from './dataUtils';
 import type { Match, LiveScore, MatchStatus, NewsItem } from './types';
 
 // ── Config ─────────────────────────────────────────────────────────────────
-// Set VITE_FD_KEY in .env.local to enable live scores (free tier, football-data.org).
-const FD_KEY  = (import.meta.env.VITE_FD_KEY as string | undefined) ?? '';
-const FD_BASE = 'https://api.football-data.org/v4';
-const WC_COMP = 'WC';       // football-data.org competition code for FIFA World Cup
+// In dev: requests go via Vite proxy (/api/fd) — key added server-side, never in browser.
+// In prod: direct football-data.org request — needs a serverless proxy for full security
+//          (or set VITE_FD_KEY as an acceptable short-term alternative).
+const WC_COMP = 'WC';   // football-data.org competition code for FIFA World Cup
 const WC_YEAR = '2026';
 
-// allorigins is a free CORS proxy — no auth needed, handles BBC RSS CORS restriction.
-const CORS_PROXY = 'https://api.allorigins.win/get?url=';
-const BBC_FEED   = 'https://feeds.bbci.co.uk/sport/football/rss.xml';
+const FD_SCORES_URL = import.meta.env.DEV
+  ? `/api/fd/competitions/${WC_COMP}/matches?season=${WC_YEAR}`
+  : (() => {
+      const key = (import.meta.env.VITE_FD_KEY as string | undefined) ?? '';
+      return key
+        ? `https://api.football-data.org/v4/competitions/${WC_COMP}/matches?season=${WC_YEAR}`
+        : null;  // no key in prod → graceful fallback to fake data
+    })();
+
+// Retain FD_KEY for non-dev direct requests
+const FD_KEY = import.meta.env.DEV ? '' : ((import.meta.env.VITE_FD_KEY as string | undefined) ?? '');
+
+// BBC Sport RSS endpoint
+const BBC_FEED = 'https://feeds.bbci.co.uk/sport/football/rss.xml';
+// Dev: use Vite server proxy (vite.config.ts routes /api/rss → BBC endpoint, no CORS issue).
+// Prod: codetabs.com free CORS proxy — returns raw XML directly, no auth needed.
+const RSS_URL = import.meta.env.DEV
+  ? '/api/rss'
+  : `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(BBC_FEED)}`;
 
 // ── In-memory TTL cache ────────────────────────────────────────────────────
 interface CacheEntry<T> { data: T; ts: number }
@@ -72,14 +88,16 @@ export async function fetchLiveScores(localMatches: Match[]): Promise<Map<number
   const cached = getCached<Map<number, LiveScore>>('scores', SCORE_TTL);
   if (cached) return cached;
 
-  if (!FD_KEY) {
-    console.info('[liveData] VITE_FD_KEY not configured — live scores disabled, using demo data');
+  if (!FD_SCORES_URL) {
+    console.info('[liveData] No FD key configured — live scores disabled, using demo data');
     return new Map();
   }
 
   try {
-    const url = `${FD_BASE}/competitions/${WC_COMP}/matches?season=${WC_YEAR}`;
-    const res = await fetch(url, { headers: { 'X-Auth-Token': FD_KEY } });
+    // In dev: key is injected by Vite proxy, no header needed here
+    // In prod: attach key directly (until a serverless proxy is in place)
+    const headers: HeadersInit = FD_KEY ? { 'X-Auth-Token': FD_KEY } : {};
+    const res = await fetch(FD_SCORES_URL, { headers });
     if (!res.ok) throw new Error(`football-data.org ${res.status}: ${res.statusText}`);
     const json  = await res.json() as FDResponse;
     const map   = buildScoreMap(json.matches, localMatches);
@@ -107,8 +125,9 @@ function parseRSS(xml: string): NewsItem[] {
 }
 
 /**
- * Fetch latest BBC Sport football headlines via allorigins CORS proxy.
- * Results are cached for 15 minutes. Returns [] on failure.
+ * Fetch latest BBC Sport football headlines.
+ * Dev: via Vite server proxy (/api/rss). Prod: via codetabs.com CORS proxy.
+ * Both return raw RSS XML. Results cached for 15 min. Returns [] on failure.
  */
 export async function fetchNewsHeadlines(): Promise<NewsItem[]> {
   const NEWS_TTL = 15 * 60 * 1000;
@@ -116,12 +135,10 @@ export async function fetchNewsHeadlines(): Promise<NewsItem[]> {
   if (cached) return cached;
 
   try {
-    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(BBC_FEED)}`;
-    const res  = await fetch(proxyUrl);
-    if (!res.ok) throw new Error(`allorigins proxy ${res.status}`);
-    const json = await res.json() as { contents: string; status: { http_code: number } };
-    if (json.status.http_code !== 200) throw new Error(`BBC RSS ${json.status.http_code}`);
-    const items = parseRSS(json.contents);
+    const res = await fetch(RSS_URL);
+    if (!res.ok) throw new Error(`RSS fetch ${res.status}`);
+    const xml   = await res.text();
+    const items = parseRSS(xml);
     setCached('news', items);
     console.info(`[liveData] ✓ news — ${items.length} items from BBC Sport`);
     return items;
