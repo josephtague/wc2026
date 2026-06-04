@@ -177,7 +177,7 @@ export default function TeletextApp() {
                   <div className="tt">
                     <StatusBar page={page} clockTick={clockTick} viewer={viewer} setViewer={setViewer} />
                     <Masthead page={page} />
-                    <SubHeader pageId={pageId} matches={matches} now={now} focusedGroup={focusedGroup} viewer={viewer} liveScores={liveScores} />
+                    <SubHeader pageId={pageId} matches={matches} now={now} focusedGroup={focusedGroup} setFocusedGroup={setFocusedGroup} viewer={viewer} liveScores={liveScores} />
 
                     {/* Page content */}
                     {pageId === 'news'     && <NewsPage     {...pageProps} />}
@@ -265,8 +265,12 @@ function Masthead({ page }: { page: PageConfig }) {
 }
 
 // ─── Sub-header ────────────────────────────────────────────────────────────
-function SubHeader({ pageId, matches, now, focusedGroup, viewer, liveScores }: {
-  pageId: PageId; matches: Match[]; now: number; focusedGroup: string; viewer: TZKey;
+const ALL_GROUPS_SUB = ['Group A','Group B','Group C','Group D','Group E','Group F',
+                        'Group G','Group H','Group I','Group J','Group K','Group L'];
+
+function SubHeader({ pageId, matches, now, focusedGroup, setFocusedGroup, viewer, liveScores }: {
+  pageId: PageId; matches: Match[]; now: number; focusedGroup: string;
+  setFocusedGroup: (g: string) => void; viewer: TZKey;
   liveScores: Map<number, LiveScore>;
 }) {
   const t = TZ[viewer]?.code ?? '';
@@ -278,7 +282,18 @@ function SubHeader({ pageId, matches, now, focusedGroup, viewer, liveScores }: {
     const count = Object.keys(groupStandings(matches, now, liveScores)).length;
     node = <>{count} GROUPS <span className="em">·</span> 48 NATIONS <span className="em">·</span> TOP 2 ADVANCE</>;
   }
-  if (pageId === 'groupdet') node = <>{focusedGroup.toUpperCase()} <span className="em">· FULL TABLE · MATCH-BY-MATCH</span></>;
+  if (pageId === 'groupdet') {
+    const idx  = ALL_GROUPS_SUB.indexOf(focusedGroup);
+    const prev = () => setFocusedGroup(ALL_GROUPS_SUB[(idx - 1 + ALL_GROUPS_SUB.length) % ALL_GROUPS_SUB.length]);
+    const next = () => setFocusedGroup(ALL_GROUPS_SUB[(idx + 1) % ALL_GROUPS_SUB.length]);
+    node = (
+      <span className="tt__sub__nav">
+        <button className="tt__sub__navbtn" onClick={prev}>◄</button>
+        <span>{focusedGroup.toUpperCase()} <span className="em">· FULL TABLE · MATCH-BY-MATCH</span></span>
+        <button className="tt__sub__navbtn" onClick={next}>►</button>
+      </span>
+    );
+  }
   if (pageId === 'review')   node = <><span className="em">— MOST RECENT RESULTS —</span> PICK BELOW TO DRILL IN</>;
   return <div className="tt__sub">{node}</div>;
 }

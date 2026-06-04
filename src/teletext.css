@@ -549,11 +549,10 @@ html, body, #root {
 .grp__drill { display: block; background: var(--tt-yellow); color: var(--tt-black); border: 0; padding: 6px 8px; font-family: var(--font-tt); font-size: 18px; letter-spacing: 0.04em; margin-top: 10px; cursor: pointer; text-align: center; width: 100%; }
 .grp__drill:hover { background: var(--tt-white); }
 
-/* ──── Group Detail inline prev/next ──── */
-.gd__letter__wrap { display: flex; flex-direction: row; align-items: center; gap: 4px; }
-.gd__nav__btn { background: transparent; border: 0; color: var(--tt-green); font-family: var(--font-tt); font-size: 20px; padding: 2px 6px; cursor: pointer; line-height: 1; }
-.gd__nav__btn:hover { color: var(--tt-white); }
-.gd__fix__hd { display: flex; align-items: center; gap: 10px; font-size: 22px; margin-bottom: 4px; }
+/* ──── Group Detail subtitle prev/next ──── */
+.tt__sub__nav { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; }
+.tt__sub__navbtn { background: transparent; border: 0; color: var(--tt-green); font-family: var(--font-tt); font-size: 20px; padding: 0 6px; cursor: pointer; line-height: 1; flex: 0 0 auto; }
+.tt__sub__navbtn:hover { color: var(--tt-white); }
 
 /* ──── News "read more" hint ──── */
 .news__read-more { font-size: 16px; margin-top: 4px; letter-spacing: 0.06em; opacity: 0.8; }
