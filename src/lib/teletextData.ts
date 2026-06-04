@@ -1,11 +1,10 @@
 // teletextData.ts — group standings, scorers, narratives, headlines.
 // TypeScript port of teletext-data.js from the design prototype.
 
-import { TZ, formatTime } from './dataUtils';
 import { resolveScore, isMatchFinished, isMatchLive } from './liveData';
 import type {
   Match, StandingRow, GroupResult,
-  TopScorer, Headline, FullResult, ScorerEntry, TZKey, LiveScore, NewsItem,
+  TopScorer, Headline, FullResult, ScorerEntry, LiveScore, NewsItem,
 } from './types';
 
 // ── Player surname pools by nation ─────────────────────────────────────────
@@ -217,12 +216,10 @@ export function topScorers(
 export function headlines(
   matches: Match[],
   nowMs: number,
-  viewer: TZKey,
   liveScores: Map<number, LiveScore> = new Map(),
   newsItems: NewsItem[] = [],
 ): Headline[] {
   const played   = matches.filter(m => isMatchFinished(m.num, m.kickoffUTC, nowMs, liveScores));
-  const upcoming = matches.filter(m => m.kickoffUTC > nowMs).slice(0, 12);
   const result: Headline[] = [];
 
   // 1. Top headline — real BBC news if available, else most decisive recent result

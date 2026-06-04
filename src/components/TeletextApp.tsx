@@ -51,8 +51,6 @@ export default function TeletextApp() {
   const [tuning,           setTuning]           = useState(false);
   const [now,              setNow]              = useState<number>(Date.now);
   const [viewer,           setViewer]           = useState<TZKey>('LDN');  // default London
-  const [fixturesPage,     setFixturesPage]     = useState(0);
-  const [resultsPage,      setResultsPage]      = useState(0);
   const [focusedGroup,     setFocusedGroup]     = useState('Group A');
   const [selectedMatchNum, setSelectedMatchNum] = useState<number | null>(null);
   const [clockTick,        setClockTick]        = useState(0);
@@ -144,14 +142,6 @@ export default function TeletextApp() {
       const page = PAGES[ID_TO_NO[pageId]];
       const fxKey = (['r','g','y','c'] as const).find(k => k === e.key.toLowerCase());
       if (fxKey && page) { const fx = page.fastext.find(f => f.c === fxKey); if (fx) switchPage(fx.to); return; }
-      if (e.key === 'ArrowRight') {
-        if (pageId === 'fixtures') setFixturesPage(p => p + 1);
-        if (pageId === 'results')  setResultsPage(p => p + 1);
-      }
-      if (e.key === 'ArrowLeft') {
-        if (pageId === 'fixtures') setFixturesPage(p => Math.max(0, p - 1));
-        if (pageId === 'results')  setResultsPage(p => Math.max(0, p - 1));
-      }
       if (e.key === 'Escape') clearTyped();
     };
     window.addEventListener('keydown', onKey);
@@ -187,8 +177,8 @@ export default function TeletextApp() {
 
                     {/* Page content */}
                     {pageId === 'news'     && <NewsPage     {...pageProps} />}
-                    {pageId === 'fixtures' && <FixturesPage {...pageProps} page={fixturesPage} setPage={setFixturesPage as (fn: (p: number) => number) => void} />}
-                    {pageId === 'results'  && <ResultsPage  {...pageProps} page={resultsPage}  setPage={setResultsPage  as (fn: (p: number) => number) => void} />}
+                    {pageId === 'fixtures' && <FixturesPage {...pageProps} />}
+                    {pageId === 'results'  && <ResultsPage  {...pageProps} />}
                     {pageId === 'groups'   && <GroupsPage   {...pageProps} />}
                     {pageId === 'groupdet' && <GroupDetailPage {...pageProps} />}
                     {pageId === 'review'   && <MatchReviewPage {...pageProps} />}

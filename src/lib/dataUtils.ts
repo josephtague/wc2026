@@ -89,24 +89,6 @@ export function formatDayShort(utcMs: number, tzKey: TZKey): string {
   return `${d.date} ${MO[d.month]}`;
 }
 
-// ── Sleep score ────────────────────────────────────────────────────────────
-export function sleepScore(hourLocal: number): number {
-  if (hourLocal >= 4  && hourLocal <  7) return 5;
-  if (hourLocal >= 0  && hourLocal <  4) return 4;
-  if (hourLocal >= 7  && hourLocal < 10) return 4;
-  if (hourLocal >= 10 && hourLocal < 13) return 3;
-  if (hourLocal >= 13 && hourLocal < 18) return 2;
-  if (hourLocal >= 18 && hourLocal < 23) return 1;
-  return 3;
-}
-export const SLEEP_QUIP: Record<number, string> = {
-  5: 'Pre-coffee misery.',
-  4: 'Early-bird tax.',
-  3: 'Coffee-break-able.',
-  2: 'Civilised afternoon.',
-  1: 'Prime time.',
-};
-
 // ── Team code shortener ────────────────────────────────────────────────────
 const TEAM_SHORT: Record<string, string> = {
   'England':'ENG','Algeria':'ALG','Mexico':'MEX','South Africa':'RSA',

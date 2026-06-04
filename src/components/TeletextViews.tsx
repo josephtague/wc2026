@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import {
   formatTime, formatDay, formatDayShort,
-  inTz, sleepScore, SLEEP_QUIP, WK, MO,
+  inTz, WK, MO,
 } from '../lib/dataUtils';
 import { resolveScore, isMatchFinished, isMatchLive } from '../lib/liveData';
 import { fullResult, narrative, groupStandings, groupResults, topScorers, headlines } from '../lib/teletextData';
@@ -25,7 +25,7 @@ interface BaseProps {
 // P100  NEWS HEADLINES
 // ─────────────────────────────────────────────────────────────────────
 export function NewsPage({ matches, now, viewer, liveScores, newsItems, switchPage, setSelectedMatchNum, setFocusedGroup }: BaseProps) {
-  const hl      = useMemo(() => headlines(matches, now, viewer, liveScores, newsItems), [matches, now, viewer, liveScores, newsItems]);
+  const hl      = useMemo(() => headlines(matches, now, liveScores, newsItems), [matches, now, liveScores, newsItems]);
   const scorers = useMemo(() => topScorers(matches, now, 6, liveScores), [matches, now, liveScores]);
   const nextMatch = useMemo(() => matches.find(m => m.kickoffUTC > now), [matches, now]);
   const [drawerItem, setDrawerItem] = useState<Headline | null>(null);
@@ -139,28 +139,23 @@ function Countdown({ to, now }: { to: number; now: number }) {
 // ─────────────────────────────────────────────────────────────────────
 // P140  UPCOMING FIXTURES
 // ─────────────────────────────────────────────────────────────────────
-interface PaginatedProps extends BaseProps {
-  page: number;
-  setPage: (fn: (p: number) => number) => void;
-}
-
-export function FixturesPage({ matches, now, viewer, liveScores, page, setPage }: PaginatedProps) {
+export function FixturesPage({ matches, now, viewer, liveScores }: BaseProps) {
   const upcoming = useMemo(
     () => matches.filter(m => !isMatchFinished(m.num, m.kickoffUTC, now, liveScores)),
     [matches, now, liveScores],
   );
-  return <FixturesOrResults rows={upcoming} viewer={viewer} liveScores={liveScores} page={page} setPage={setPage} showResults={false} showSleep now={now} />;
+  return <FixturesOrResults rows={upcoming} viewer={viewer} liveScores={liveScores} showResults={false} now={now} />;
 }
 
 // ─────────────────────────────────────────────────────────────────────
 // P141  RESULTS
 // ─────────────────────────────────────────────────────────────────────
-export function ResultsPage({ matches, now, viewer, liveScores, page, setPage }: PaginatedProps) {
+export function ResultsPage({ matches, now, viewer, liveScores }: BaseProps) {
   const played = useMemo(
     () => matches.filter(m => isMatchFinished(m.num, m.kickoffUTC, now, liveScores)).slice().reverse(),
     [matches, now, liveScores],
   );
-  return <FixturesOrResults rows={played} viewer={viewer} liveScores={liveScores} page={page} setPage={setPage} showResults showSleep={false} now={now} />;
+  return <FixturesOrResults rows={played} viewer={viewer} liveScores={liveScores} showResults now={now} />;
 }
 
 // Shared list renderer
@@ -168,13 +163,10 @@ interface FORProps {
   rows: Match[];
   viewer: TZKey;
   liveScores: Map<number, LiveScore>;
-  page: number;
-  setPage: (fn: (p: number) => number) => void;
   showResults: boolean;
-  showSleep: boolean;
   now: number;
 }
-function FixturesOrResults({ rows, viewer, liveScores, page, setPage, showResults, showSleep, now }: FORProps) {
+function FixturesOrResults({ rows, viewer, liveScores, showResults, now }: FORProps) {
   const days = useMemo(() => {
     const map = new Map<string, { key: string; label: string; matches: Match[] }>();
     rows.forEach(m => {
@@ -190,9 +182,6 @@ function FixturesOrResults({ rows, viewer, liveScores, page, setPage, showResult
     return [...map.values()];
   }, [rows, viewer]);
 
-  const colA = days.slice(0, Math.ceil(days.length / 2));
-  const colB = days.slice(Math.ceil(days.length / 2));
-
   const renderRow = (m: Match) => {
     const t          = formatTime(m.kickoffUTC, viewer);
     const finished   = isMatchFinished(m.num, m.kickoffUTC, now, liveScores);
@@ -201,8 +190,6 @@ function FixturesOrResults({ rows, viewer, liveScores, page, setPage, showResult
     const r          = (showResults && finished) ? resolveScore(m.num, liveScores) : null;
     const cls        = finished ? 'is-result' : live ? 'is-live' : '';
     const vsLabel    = finished ? (r ? `${r.home}–${r.away}` : '—') : live ? 'LIVE' : 'v';
-    const local      = inTz(m.kickoffUTC, viewer);
-    const sleep      = sleepScore(local.hour);
     return (
       <div className={`fix__card${cls ? ` ${cls}` : ''}`} key={m.num}>
         <div className="fix__card__time">{t}</div>
@@ -218,28 +205,17 @@ function FixturesOrResults({ rows, viewer, liveScores, page, setPage, showResult
     );
   };
 
-  const renderCol = (col: typeof colA) => col.map(day => (
-    <div className="fix__day" key={day.key}>
-      <div className="dayhead">─── <span className="c-c">{day.label}</span> ───</div>
-      {day.matches.map(renderRow)}
-    </div>
-  ));
-
   return (
     <div className="tt__body">
       <div className="fix__cols">
-        <div>{renderCol(colA)}</div>
-        <div>{renderCol(colB)}</div>
+        {days.map(day => (
+          <div className="fix__day" key={day.key}>
+            <div className="dayhead">─── <span className="c-c">{day.label}</span> ───</div>
+            {day.matches.map(renderRow)}
+          </div>
+        ))}
       </div>
     </div>
-  );
-}
-
-function SleepDot({ s }: { s: number }) {
-  const color = s >= 5 ? 'var(--tt-red)' : s >= 4 ? 'var(--tt-magenta)' : s >= 3 ? 'var(--tt-yellow)' : 'var(--tt-green)';
-  const label = s >= 5 ? 'ZZ' : s >= 4 ? 'Z!' : s >= 3 ? '··' : 'OK';
-  return (
-    <span style={{ color, fontSize: 18, marginRight: 6, letterSpacing: 0 }} title={SLEEP_QUIP[s]}>{label}</span>
   );
 }
 
@@ -315,17 +291,11 @@ export function GroupsPage({ matches, now, liveScores, focusedGroup, setFocusedG
 // ─────────────────────────────────────────────────────────────────────
 // P151  GROUP DETAIL
 // ─────────────────────────────────────────────────────────────────────
-const ALL_GROUPS = ['Group A','Group B','Group C','Group D','Group E','Group F',
-                    'Group G','Group H','Group I','Group J','Group K','Group L'];
-
-export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup, setFocusedGroup, setSelectedMatchNum, switchPage }: BaseProps) {
+export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup, setSelectedMatchNum, switchPage }: BaseProps) {
   const g        = focusedGroup || 'Group A';
   const standings = useMemo(() => groupStandings(matches, now, liveScores)[g] ?? [], [matches, now, liveScores, g]);
   const fixtures  = useMemo(() => groupResults(matches, g, now, liveScores), [matches, g, now, liveScores]);
   const letter    = g.replace('Group ', '');
-  const idx       = ALL_GROUPS.indexOf(g);
-  const prevGroup = () => setFocusedGroup(ALL_GROUPS[(idx - 1 + ALL_GROUPS.length) % ALL_GROUPS.length]);
-  const nextGroup = () => setFocusedGroup(ALL_GROUPS[(idx + 1) % ALL_GROUPS.length]);
 
   return (
     <div className="tt__body">
