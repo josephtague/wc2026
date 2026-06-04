@@ -21,8 +21,20 @@ const PAGES: Record<string, PageConfig> = {
   '140': { id: 'fixtures', no: '140', title: 'FIXTURES', titleColor: 'is-yellow', subRight: 'WORLD CUP 2026', fastext: NAV },
   '141': { id: 'results',  no: '141', title: 'RESULTS',  titleColor: '',          subRight: 'WORLD CUP 2026', fastext: NAV },
   '150': { id: 'groups',   no: '150', title: 'GROUPS',   titleColor: '',          subRight: 'WORLD CUP 2026', fastext: NAV },
-  '151': { id: 'groupdet', no: '151', title: 'GROUP',    titleColor: 'is-yellow', subRight: 'WORLD CUP 2026', fastext: NAV },
-  '160': { id: 'review',   no: '160', title: 'REPORT',   titleColor: 'is-white',  subRight: 'WORLD CUP 2026', fastext: NAV },
+  '151': { id: 'groupdet', no: '151', title: 'GROUP',    titleColor: 'is-yellow', subRight: 'WORLD CUP 2026',
+    fastext: [
+      { c: 'r', label: 'NEWS',         to: 'news'     },
+      { c: 'g', label: 'FIXTURES',     to: 'fixtures' },
+      { c: 'y', label: 'RESULTS',      to: 'results'  },
+      { c: 'c', label: 'GROUP DETAIL', to: 'groups'   },
+    ] },
+  '160': { id: 'review',   no: '160', title: 'REPORT',   titleColor: 'is-white',  subRight: 'WORLD CUP 2026',
+    fastext: [
+      { c: 'r', label: 'NEWS',         to: 'news'     },
+      { c: 'g', label: 'FIXTURES',     to: 'fixtures' },
+      { c: 'y', label: 'MATCH REPORT', to: 'results'  },
+      { c: 'c', label: 'GROUPS',       to: 'groups'   },
+    ] },
 };
 const ID_TO_NO: Record<PageId, string> = { news:'100',fixtures:'140',results:'141',groups:'150',groupdet:'151',review:'160' };
 

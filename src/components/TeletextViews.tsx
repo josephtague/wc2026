@@ -331,7 +331,11 @@ export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup
     <div className="tt__body">
       <div className="gd">
         <div className="gd__head">
-          <div className="gd__letter">{letter}</div>
+          <div className="gd__letter__wrap">
+            <button className="gd__nav__btn" onClick={prevGroup}>◄</button>
+            <div className="gd__letter">{letter}</div>
+            <button className="gd__nav__btn" onClick={nextGroup}>►</button>
+          </div>
           <div>
             <div className="gd__title c-y">GROUP {letter}</div>
             <div className="gd__teams c-c">{standings.map(t => t.short).join(' · ')}</div>
@@ -361,7 +365,11 @@ export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup
         </div>
 
         <div className="gd__fix">
-          <div className="c-g" style={{ fontSize: 22, marginBottom: 4 }}>► MATCH-BY-MATCH</div>
+          <div className="gd__fix__hd">
+            <button className="gd__nav__btn" onClick={prevGroup}>◄</button>
+            <span className="c-g">► MATCH-BY-MATCH</span>
+            <button className="gd__nav__btn" onClick={nextGroup}>►</button>
+          </div>
           {fixtures.map(({ m, finished, live, score }) => (
             <div key={m.num} className="gd__fix__row"
               onClick={() => { if (finished) { setSelectedMatchNum(m.num); switchPage('review'); } }}
