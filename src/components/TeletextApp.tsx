@@ -1,6 +1,6 @@
 // TeletextApp.tsx — TV chassis, remote control, page router, keyboard handling
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { loadMatches, TZ, TZ_ORDER } from '../lib/dataUtils';
+import { loadMatches, TZ, TZ_ORDER, TZ_CITY } from '../lib/dataUtils';
 import { fetchLiveScores, fetchNewsHeadlines, isMatchLive } from '../lib/liveData';
 import type { Match, TZKey, PageId, PageConfig, LiveScore, NewsItem } from '../lib/types';
 import {
@@ -227,7 +227,7 @@ function StatusBar({ page, clockTick: _tick, viewer, setViewer }: {
       <span className="tz">
         <span className="c-dim">TZ ▸</span>
         {TZ_ORDER.map(zk => (
-          <button key={zk} className={`tz__btn${viewer === zk ? ' on' : ''}`} onClick={() => setViewer(zk)}>{zk}</button>
+          <button key={zk} className={`tz__btn${viewer === zk ? ' on' : ''}`} onClick={() => setViewer(zk)}>{TZ_CITY[zk]}</button>
         ))}
       </span>
       <span className="when">
@@ -366,7 +366,7 @@ function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setVie
         <div className="rmt__tz__lbl c-dim">TIME ZONE</div>
         <div className="rmt__tz__row">
           {TZ_ORDER.map(zk => (
-            <button key={zk} className={`rmt__tzbtn${viewer === zk ? ' on' : ''}`} onClick={() => setViewer(zk)}>{zk}</button>
+            <button key={zk} className={`rmt__tzbtn${viewer === zk ? ' on' : ''}`} onClick={() => setViewer(zk)}>{TZ_CITY[zk]}</button>
           ))}
         </div>
       </div>

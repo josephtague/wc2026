@@ -8,6 +8,7 @@ import type { TZKey, TZInfo, StageInfo, RawMatch, Match, TeamInfo, DateParts, Fa
 // IST uses 5.5 (UTC+5:30) — the fractional offset works fine with the ms math.
 export const TZ: Record<TZKey, TZInfo> = {
   PT:  { key: 'PT',  label: 'Los Angeles',  code: 'PT',   offsetHrs: -7   },
+  CDM: { key: 'CDM', label: 'Mexico City',  code: 'CST',  offsetHrs: -6   },
   ET:  { key: 'ET',  label: 'New York',     code: 'ET',   offsetHrs: -4   },
   BRT: { key: 'BRT', label: 'São Paulo',    code: 'BRT',  offsetHrs: -3   },
   ART: { key: 'ART', label: 'Buenos Aires', code: 'ART',  offsetHrs: -3   },
@@ -16,7 +17,13 @@ export const TZ: Record<TZKey, TZInfo> = {
   MUM: { key: 'MUM', label: 'Mumbai',       code: 'IST',  offsetHrs:  5.5 },
   SYD: { key: 'SYD', label: 'Sydney',       code: 'AEST', offsetHrs: 10   },
 };
-export const TZ_ORDER: TZKey[] = ['PT', 'ET', 'BRT', 'ART', 'LDN', 'PAR', 'MUM', 'SYD'];
+export const TZ_ORDER: TZKey[] = ['PT', 'CDM', 'ET', 'BRT', 'ART', 'LDN', 'PAR', 'MUM', 'SYD'];
+
+/** Short city labels for TZ buttons — consistent city names, west→east */
+export const TZ_CITY: Record<TZKey, string> = {
+  PT: 'LA', CDM: 'CDMX', ET: 'NY', BRT: 'SAO', ART: 'BUE',
+  LDN: 'LON', PAR: 'PAR', MUM: 'MUM', SYD: 'SYD',
+};
 
 // ── Stage metadata ─────────────────────────────────────────────────────────
 const STAGES_BY_NAME: Record<string, StageInfo> = {

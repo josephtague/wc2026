@@ -419,9 +419,23 @@ html, body, #root {
 .bg-m { background: var(--tt-magenta); color: var(--tt-black); padding: 0 6px; }
 
 /* ──── P140 — FIXTURES LIST ──── */
-.fix__cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 36px; font-size: 26px; line-height: 1.18; }
-.fix__day { margin-bottom: 6px; }
-.fix__day .dayhead { color: var(--tt-cyan); letter-spacing: 0.04em; }
+.fix__cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; font-size: 22px; line-height: 1.18; }
+.fix__day { margin-bottom: 4px; }
+.fix__day .dayhead { color: var(--tt-cyan); letter-spacing: 0.04em; margin-bottom: 2px; }
+/* Match card layout */
+.fix__card { display: grid; grid-template-columns: 60px 1fr; grid-template-rows: auto auto; gap: 1px 10px; border-bottom: 1px dashed rgba(43,242,255,0.18); padding: 6px 4px; }
+.fix__card__time  { color: var(--tt-yellow); font-size: 20px; text-align: center; line-height: 1.1; align-self: center; grid-row: 1 / 3; }
+.fix__card__match { display: flex; align-items: center; gap: 6px; font-size: 20px; }
+.fix__card__home  { flex: 1; text-align: right; }
+.fix__card__away  { flex: 1; }
+.fix__card__vs    { color: var(--tt-dim); min-width: 36px; text-align: center; }
+.fix__card__vs.sc { color: var(--tt-yellow); font-weight: bold; }
+.fix__card.is-live .fix__card__time { color: var(--tt-red); }
+.fix__card.is-live .fix__card__vs   { color: var(--tt-red); }
+.fix__card.is-result .fix__card__home,
+.fix__card.is-result .fix__card__away { color: var(--tt-cyan); }
+.fix__card__meta  { font-size: 15px; color: var(--tt-dim); letter-spacing: 0.03em; display: flex; align-items: center; gap: 4px; }
+/* Legacy row rules kept for results page fallback */
 .fix__row { display: grid; grid-template-columns: 70px 1fr 64px 1fr 100px; align-items: baseline; gap: 8px; }
 .fix__row .t    { color: var(--tt-yellow); }
 .fix__row .home { color: var(--tt-white); text-align: right; }
@@ -651,22 +665,26 @@ html, body, #root {
   .tt__body { overflow-y: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .tt__body::-webkit-scrollbar { display: none; }
 
-  /* News page — hero first, countdown (2/3) + golden boot (1/3) side by side, headlines below */
-  .news__hero            { padding-bottom: 4px; order: 0; }
+  /* News page — countdown grid first, hero headline below (scrollable) */
+  .news__hero            { padding-bottom: 4px; order: 2; }
   .news__grid            { order: 1; display: flex; flex-direction: column; gap: 10px; }
   .news__col:last-child  { order: -1; display: flex; flex-direction: row; gap: 8px; }
   .news__col:first-child { order: 1; }
   .news__nextup          { flex: 2; padding: 6px 8px; text-align: left; }
   .news__scorers         { flex: 1; padding: 6px 8px; font-size: clamp(12px, 3.4vw, 18px); }
-  .news__title { font-size: clamp(15px, 4.5vw, 28px); }
-  .news__body  { font-size: clamp(13px, 3.8vw, 22px); }
-  .news__sub   { font-size: clamp(13px, 3.8vw, 22px); }
-  .news__countdown { font-size: clamp(18px, 5.5vw, 32px); }
+  .news__title     { font-size: clamp(15px, 4.5vw, 28px); }
+  .news__body      { font-size: clamp(13px, 3.8vw, 22px); }
+  .news__sub       { font-size: clamp(13px, 3.8vw, 22px); }
+  .news__countdown { font-size: clamp(13px, 3.8vw, 22px); }
+  .news__nextmatch { font-size: clamp(12px, 3.4vw, 18px); }
 
-  /* Fixtures — single column, simplified row */
-  .fix__cols { grid-template-columns: 1fr; gap: 10px; font-size: clamp(13px, 3.8vw, 22px); }
-  .fix__row  { grid-template-columns: 52px 1fr 28px 1fr; gap: 4px; }
-  .fix__row .st { display: none; }
+  /* Fixtures — cards, single column */
+  .fix__cols { grid-template-columns: 1fr; gap: 0; font-size: clamp(13px, 3.8vw, 22px); }
+  .fix__card { grid-template-columns: 48px 1fr; gap: 1px 8px; padding: 5px 2px; }
+  .fix__card__match { font-size: clamp(13px, 3.8vw, 20px); gap: 4px; }
+  .fix__card__vs    { min-width: 28px; }
+  .fix__card__time  { font-size: clamp(12px, 3.4vw, 18px); }
+  .fix__card__meta  { font-size: clamp(10px, 2.8vw, 14px); }
   .fix__page { font-size: clamp(14px, 4vw, 22px); }
   .fix__pgbtn { padding: 4px 12px; }
 
@@ -676,14 +694,21 @@ html, body, #root {
   .grp__grid   { grid-template-columns: repeat(2, 1fr); gap: 8px 10px; font-size: clamp(12px, 3.4vw, 18px); }
   .grp__card:active { outline-color: var(--tt-yellow) !important; }
 
-  /* Group detail — shrink the giant letter so the table fits; add nav bar */
+  /* Group detail — 8-col table (drop GF/GA), allow scroll to match-by-match */
+  .gd          { height: auto; }
+  .gd__fix     { overflow: visible; }
   .gd__letter { font-size: clamp(40px, 14vw, 110px); padding: 4px 0; }
   .gd__head   { grid-template-columns: clamp(60px, 18vw, 140px) 1fr; gap: 10px; }
   .gd__title  { font-size: clamp(16px, 5vw, 30px); }
   .gd__teams  { font-size: clamp(14px, 4vw, 24px); margin-top: 3px; }
   .gd__stand  { font-size: clamp(13px, 3.8vw, 22px); }
   .gd__stand__head,
-  .gd__stand__row { grid-template-columns: 22px 1fr 26px 26px 26px 26px 30px 30px 32px 32px; gap: 3px; font-size: clamp(12px, 3.4vw, 22px); }
+  .gd__stand__row { grid-template-columns: 20px 1fr 24px 24px 24px 24px 32px 32px; gap: 3px; font-size: clamp(12px, 3.4vw, 22px); }
+  /* hide GF (7th) and GA (8th) col — show GD and Pts only */
+  .gd__stand__head span:nth-child(7),
+  .gd__stand__head span:nth-child(8),
+  .gd__stand__row  span:nth-child(7),
+  .gd__stand__row  span:nth-child(8) { display: none; }
 
   /* Remote: flex: 1 fills all remaining height below the screen */
   .rmt {
@@ -711,8 +736,8 @@ html, body, #root {
 
   /* TZ — single row of 8, generous height */
   .rmt__tz__lbl { font-size: 9px; letter-spacing: 0.08em; }
-  .rmt__tz__row { grid-template-columns: repeat(8, 1fr); gap: 5px; }
-  .rmt__tzbtn { height: 38px; font-size: 9px; }
+  .rmt__tz__row { grid-template-columns: repeat(9, 1fr); gap: 4px; }
+  .rmt__tzbtn { height: 34px; font-size: 8px; }
 
   /* footer ticker — pinned to bottom */
   .rmt__foot { font-size: 12px; padding: 8px 12px; border-radius: 4px; margin-top: auto; }

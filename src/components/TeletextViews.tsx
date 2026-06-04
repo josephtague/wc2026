@@ -203,30 +203,23 @@ function FixturesOrResults({ rows, viewer, liveScores, page, setPage, showResult
     const finished   = isMatchFinished(m.num, m.kickoffUTC, now, liveScores);
     const live       = isMatchLive(m.num, m.kickoffUTC, now, liveScores);
     const stageShort = m.stageId === 'group' ? m.group.replace('Group ', 'GP ') : m.stageShort;
-    if (showResults && finished) {
-      const r = resolveScore(m.num, liveScores);
-      return (
-        <div className="fix__row is-result" key={m.num}>
-          <span className="t">{t}</span>
-          <span className="home">{m.teams[0].short}</span>
-          <span className="sc">{r ? `${r.home}-${r.away}` : '—'}</span>
-          <span className="away">{m.teams[1].short}</span>
-          <span className="st">{stageShort}</span>
-        </div>
-      );
-    }
-    const local = inTz(m.kickoffUTC, viewer);
-    const sleep = sleepScore(local.hour);
+    const r          = (showResults && finished) ? resolveScore(m.num, liveScores) : null;
+    const cls        = finished ? 'is-result' : live ? 'is-live' : '';
+    const vsLabel    = finished ? (r ? `${r.home}–${r.away}` : '—') : live ? 'LIVE' : 'v';
+    const local      = inTz(m.kickoffUTC, viewer);
+    const sleep      = sleepScore(local.hour);
     return (
-      <div className={`fix__row${live ? ' is-live' : ''}`} key={m.num}>
-        <span className="t">{t}</span>
-        <span className="home">{m.teams[0].short}</span>
-        <span className="vs">{live ? 'LIVE' : 'v'}</span>
-        <span className="away">{m.teams[1].short}</span>
-        <span className="st">
-          {showSleep && <SleepDot s={sleep} />}
-          {stageShort}
-        </span>
+      <div className={`fix__card${cls ? ` ${cls}` : ''}`} key={m.num}>
+        <div className="fix__card__time">{t}</div>
+        <div className="fix__card__match">
+          <span className="fix__card__home c-w">{m.teams[0].short}</span>
+          <span className={`fix__card__vs${finished ? ' sc' : ''}`}>{vsLabel}</span>
+          <span className="fix__card__away c-w">{m.teams[1].short}</span>
+        </div>
+        <div className="fix__card__meta">
+          {showSleep && !finished && <SleepDot s={sleep} />}
+          {stageShort}{m.city ? ` · ${m.city}` : ''}
+        </div>
       </div>
     );
   };
