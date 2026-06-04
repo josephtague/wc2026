@@ -212,7 +212,6 @@ function FixturesOrResults({ rows, viewer, liveScores, page, setPage, showResult
           <span className="fix__card__away c-w">{m.teams[1].short}</span>
         </div>
         <div className="fix__card__meta">
-          {showSleep && !finished && <SleepDot s={sleep} />}
           {stageShort}{m.city ? ` · ${m.city}` : ''}
         </div>
       </div>
@@ -228,14 +227,6 @@ function FixturesOrResults({ rows, viewer, liveScores, page, setPage, showResult
 
   return (
     <div className="tt__body">
-      {showSleep && (
-        <div className="fix__legend">
-          <span style={{ color: 'var(--tt-green)' }}>OK</span> good time ·{' '}
-          <span style={{ color: 'var(--tt-yellow)' }}>··</span> late ·{' '}
-          <span style={{ color: 'var(--tt-magenta)' }}>Z!</span> very late ·{' '}
-          <span style={{ color: 'var(--tt-red)' }}>ZZ</span> unsociable
-        </div>
-      )}
       <div className="fix__cols">
         <div>{renderCol(colA)}</div>
         <div>{renderCol(colB)}</div>
@@ -339,12 +330,6 @@ export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup
   return (
     <div className="tt__body">
       <div className="gd">
-        <div className="gd__nav">
-          <button onClick={prevGroup}>◄ PREV</button>
-          <span className="gd__nav__label">{g.toUpperCase()}</span>
-          <button onClick={nextGroup}>NEXT ►</button>
-        </div>
-
         <div className="gd__head">
           <div className="gd__letter">{letter}</div>
           <div>
