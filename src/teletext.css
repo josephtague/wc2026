@@ -611,11 +611,12 @@ html, body, #root {
     border-radius: 10px;
   }
 
-  /* Portrait aspect ratio — taller screen shows full table rows */
+  /* Portrait aspect ratio — capped so screen + remote always fit in one viewport */
   .tv__bezel {
     padding: 8px;
     border-radius: 14px;
     aspect-ratio: 4 / 7;
+    max-height: calc(100dvh - 215px);
   }
 
   .crt { border-radius: 12px / 8px; }
@@ -640,12 +641,13 @@ html, body, #root {
   /* Fastext label bar */
   .tt__fastext button { font-size: clamp(10px, 2.8vw, 20px); padding: 2px 4px; }
 
-  /* News page */
-  .news__hero { padding-bottom: 4px; }
+  /* News page — reorder: countdown first, hero headline below */
+  .news__hero { padding-bottom: 4px; order: 2; }
+  .news__grid  { order: 1; }
   .news__title { font-size: clamp(15px, 4.5vw, 28px); }
   .news__body  { font-size: clamp(13px, 3.8vw, 22px); }
   .news__sub   { font-size: clamp(13px, 3.8vw, 22px); }
-  /* Reflow grid to single column; countdown column floats to top */
+  /* Reflow grid to single column; both cols stack naturally */
   .news__grid        { display: flex; flex-direction: column; gap: 10px; }
   .news__col:last-child  { order: -1; }
   .news__col:first-child { order: 1; }

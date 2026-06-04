@@ -15,7 +15,14 @@ export default defineConfig(({ mode }) => {
         '/api/rss': {
           target: 'https://feeds.bbci.co.uk',
           changeOrigin: true,
+          secure: false,
           rewrite: () => '/sport/football/rss.xml',
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
+              proxyReq.setHeader('Accept', 'application/rss+xml, text/xml, */*');
+            });
+          },
         },
         // football-data.org — key injected server-side, never exposed to the browser
         '/api/fd': {
