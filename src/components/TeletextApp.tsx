@@ -245,7 +245,7 @@ function Masthead({ page }: { page: PageConfig }) {
       <div className="tt__brand">
         <div className="tt__logo"><TrophyMosaic /></div>
         <div className={`tt__title ${page.titleColor}`}>{page.title}</div>
-        <div className="tt__head-tag c-r">WORLD CUP<br />2026</div>
+        <div className="tt__head-tag c-r">WC 2026</div>
       </div>
     </div>
   );

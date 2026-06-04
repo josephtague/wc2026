@@ -1,6 +1,6 @@
 // types.ts — shared TypeScript interfaces for the WC2026 Teletext app
 
-export type TZKey = 'PT' | 'CDM' | 'ET' | 'BRT' | 'ART' | 'LDN' | 'PAR' | 'MUM' | 'SYD';
+export type TZKey = 'PT' | 'CDM' | 'ET' | 'BRT' | 'ART' | 'LDN' | 'PAR' | 'DXB' | 'SHA' | 'TYO' | 'SYD';
 
 export interface TZInfo {
   key: TZKey;

@@ -40,21 +40,20 @@ export function NewsPage({ matches, now, viewer, liveScores, newsItems, switchPa
 
   return (
     <div className="tt__body news">
-      <div className="news__hero"
-        onClick={() => hl[0] && handleHeadlineClick(hl[0])}
-        style={{ cursor: hl[0]?.kind === 'news' ? 'pointer' : 'default' }}>
-        <span className="news__kick c-r">★ HEADLINE</span>
-        {hl[0] && (
-          <>
-            <div className="news__title c-y">{hl[0].title}</div>
-            <div className="news__body c-c">{trim(hl[0].body, 180)}</div>
-            {hl[0].kind === 'news' && <div className="news__read-more c-g">▸ TAP TO READ MORE</div>}
-          </>
-        )}
-      </div>
-
       <div className="news__grid">
         <div className="news__col">
+          <div className="news__hero"
+            onClick={() => hl[0] && handleHeadlineClick(hl[0])}
+            style={{ cursor: hl[0]?.kind === 'news' ? 'pointer' : 'default' }}>
+            <span className="news__kick c-r">★ HEADLINE</span>
+            {hl[0] && (
+              <>
+                <div className="news__title c-y">{hl[0].title}</div>
+                <div className="news__body c-c">{trim(hl[0].body, 180)}</div>
+                {hl[0].kind === 'news' && <div className="news__read-more c-g">▸ TAP TO READ MORE</div>}
+              </>
+            )}
+          </div>
           {hl.slice(1).map((h, i) => (
             <div key={i} className="news__item"
               onClick={() => handleHeadlineClick(h)}
@@ -99,7 +98,7 @@ export function NewsPage({ matches, now, viewer, liveScores, newsItems, switchPa
         </div>
       </div>
 
-      <NewsDrawer item={drawerItem} onClose={() => setDrawerItem(null)} />
+        <NewsDrawer item={drawerItem} onClose={() => setDrawerItem(null)} />
     </div>
   );
 }
@@ -191,12 +190,8 @@ function FixturesOrResults({ rows, viewer, liveScores, page, setPage, showResult
     return [...map.values()];
   }, [rows, viewer]);
 
-  const PER_PAGE   = 6;
-  const totalPages = Math.max(1, Math.ceil(days.length / PER_PAGE));
-  const pg         = Math.min(page, totalPages - 1);
-  const visible    = days.slice(pg * PER_PAGE, (pg + 1) * PER_PAGE);
-  const colA = visible.slice(0, 3);
-  const colB = visible.slice(3, 6);
+  const colA = days.slice(0, Math.ceil(days.length / 2));
+  const colB = days.slice(Math.ceil(days.length / 2));
 
   const renderRow = (m: Match) => {
     const t          = formatTime(m.kickoffUTC, viewer);
@@ -232,17 +227,18 @@ function FixturesOrResults({ rows, viewer, liveScores, page, setPage, showResult
   ));
 
   return (
-    <div className="tt__body" style={{ position: 'relative' }}>
+    <div className="tt__body">
+      {showSleep && (
+        <div className="fix__legend">
+          <span style={{ color: 'var(--tt-green)' }}>OK</span> good time ·{' '}
+          <span style={{ color: 'var(--tt-yellow)' }}>··</span> late ·{' '}
+          <span style={{ color: 'var(--tt-magenta)' }}>Z!</span> very late ·{' '}
+          <span style={{ color: 'var(--tt-red)' }}>ZZ</span> unsociable
+        </div>
+      )}
       <div className="fix__cols">
         <div>{renderCol(colA)}</div>
         <div>{renderCol(colB)}</div>
-      </div>
-      <div className="fix__page">
-        <button className="fix__pgbtn" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={pg === 0}>◄</button>
-        <span className="c-y">{pg + 1}</span>
-        <span className="c-dim">/</span>
-        <span className="c-w">{totalPages}</span>
-        <button className="fix__pgbtn" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={pg === totalPages - 1}>►</button>
       </div>
     </div>
   );
@@ -343,6 +339,12 @@ export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup
   return (
     <div className="tt__body">
       <div className="gd">
+        <div className="gd__nav">
+          <button onClick={prevGroup}>◄ PREV</button>
+          <span className="gd__nav__label">{g.toUpperCase()}</span>
+          <button onClick={nextGroup}>NEXT ►</button>
+        </div>
+
         <div className="gd__head">
           <div className="gd__letter">{letter}</div>
           <div>
@@ -389,12 +391,6 @@ export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup
               <span className="c-dim">{m.city}</span>
             </div>
           ))}
-        </div>
-
-        <div className="gd__nav">
-          <button onClick={prevGroup}>◄ PREV</button>
-          <span className="gd__nav__label">{g.toUpperCase()}</span>
-          <button onClick={nextGroup}>NEXT ►</button>
         </div>
       </div>
     </div>
