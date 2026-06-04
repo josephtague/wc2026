@@ -10,19 +10,19 @@ import {
 import { groupStandings, topScorers } from '../lib/teletextData';
 
 // ── Page registry ──────────────────────────────────────────────────────────
+const NAV: PageConfig['fastext'] = [
+  { c: 'r', label: 'NEWS',     to: 'news'     },
+  { c: 'g', label: 'FIXTURES', to: 'fixtures' },
+  { c: 'y', label: 'RESULTS',  to: 'results'  },
+  { c: 'c', label: 'GROUPS',   to: 'groups'   },
+];
 const PAGES: Record<string, PageConfig> = {
-  '100': { id: 'news',     no: '100', title: 'NEWS',     titleColor: 'is-yellow', subRight: 'WORLD CUP 2026',
-    fastext: [{ c: 'r', label: 'INDEX',        to: 'news' },{ c: 'g', label: 'FIXTURES',     to: 'fixtures' },{ c: 'y', label: 'RESULTS',      to: 'results' },{ c: 'c', label: 'GROUP TABLES', to: 'groups' }] },
-  '140': { id: 'fixtures', no: '140', title: 'FIXTURES', titleColor: 'is-yellow', subRight: 'WORLD CUP 2026',
-    fastext: [{ c: 'r', label: 'NEWS',         to: 'news' },{ c: 'g', label: 'RESULTS',      to: 'results' },{ c: 'y', label: 'GROUP TABLES', to: 'groups' },{ c: 'c', label: 'MATCH REPORT', to: 'review' }] },
-  '141': { id: 'results',  no: '141', title: 'RESULTS',  titleColor: '',          subRight: 'WORLD CUP 2026',
-    fastext: [{ c: 'r', label: 'NEWS',         to: 'news' },{ c: 'g', label: 'FIXTURES',     to: 'fixtures' },{ c: 'y', label: 'GROUP TABLES', to: 'groups' },{ c: 'c', label: 'MATCH REPORT', to: 'review' }] },
-  '150': { id: 'groups',   no: '150', title: 'GROUPS',   titleColor: '',          subRight: 'WORLD CUP 2026',
-    fastext: [{ c: 'r', label: 'NEWS',         to: 'news' },{ c: 'g', label: 'FIXTURES',     to: 'fixtures' },{ c: 'y', label: 'RESULTS',      to: 'results' },{ c: 'c', label: 'GROUP DETAIL', to: 'groupdet' }] },
-  '151': { id: 'groupdet', no: '151', title: 'GROUP',    titleColor: 'is-yellow', subRight: 'WORLD CUP 2026',
-    fastext: [{ c: 'r', label: 'NEWS',         to: 'news' },{ c: 'g', label: 'BACK TO GROUPS',to: 'groups'},{ c: 'y', label: 'FIXTURES',     to: 'fixtures' },{ c: 'c', label: 'MATCH REPORT', to: 'review' }] },
-  '160': { id: 'review',   no: '160', title: 'REPORT',   titleColor: 'is-white',  subRight: 'WORLD CUP 2026',
-    fastext: [{ c: 'r', label: 'NEWS',         to: 'news' },{ c: 'g', label: 'FIXTURES',     to: 'fixtures' },{ c: 'y', label: 'RESULTS',      to: 'results' },{ c: 'c', label: 'GROUP TABLES', to: 'groups' }] },
+  '100': { id: 'news',     no: '100', title: 'NEWS',     titleColor: 'is-yellow', subRight: 'WORLD CUP 2026', fastext: NAV },
+  '140': { id: 'fixtures', no: '140', title: 'FIXTURES', titleColor: 'is-yellow', subRight: 'WORLD CUP 2026', fastext: NAV },
+  '141': { id: 'results',  no: '141', title: 'RESULTS',  titleColor: '',          subRight: 'WORLD CUP 2026', fastext: NAV },
+  '150': { id: 'groups',   no: '150', title: 'GROUPS',   titleColor: '',          subRight: 'WORLD CUP 2026', fastext: NAV },
+  '151': { id: 'groupdet', no: '151', title: 'GROUP',    titleColor: 'is-yellow', subRight: 'WORLD CUP 2026', fastext: NAV },
+  '160': { id: 'review',   no: '160', title: 'REPORT',   titleColor: 'is-white',  subRight: 'WORLD CUP 2026', fastext: NAV },
 };
 const ID_TO_NO: Record<PageId, string> = { news:'100',fixtures:'140',results:'141',groups:'150',groupdet:'151',review:'160' };
 
@@ -205,6 +205,7 @@ export default function TeletextApp() {
             now={now}
             liveScores={liveScores}
             lastUpdated={lastUpdated}
+            newsItems={newsItems}
           />
         </div>
       </div>
@@ -303,7 +304,7 @@ function TrophyMosaic() {
 }
 
 // ─── Remote control ────────────────────────────────────────────────────────
-function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setViewer, matches, now, liveScores, lastUpdated }: {
+function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setViewer, matches, now, liveScores, lastUpdated, newsItems }: {
   page: PageConfig;
   typed: string;
   typeDigit: (d: string) => void;
@@ -315,6 +316,7 @@ function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setVie
   now: number;
   liveScores: Map<number, LiveScore>;
   lastUpdated: number | null;
+  newsItems: NewsItem[];
 }) {
   return (
     <div className="rmt">
@@ -380,7 +382,7 @@ function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setVie
 
       {/* Brand foot — live ticker */}
       <div className="rmt__foot">
-        <LiveTicker matches={matches} now={now} liveScores={liveScores} lastUpdated={lastUpdated} />
+        <LiveTicker matches={matches} now={now} liveScores={liveScores} lastUpdated={lastUpdated} newsItems={newsItems} />
         <span className="rmt__pwr"></span>
       </div>
     </div>
@@ -388,11 +390,12 @@ function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setVie
 }
 
 // ─── Live ticker (rotates every 4 s in the remote footer) ─────────────────
-function LiveTicker({ matches, now, liveScores, lastUpdated }: {
+function LiveTicker({ matches, now, liveScores, lastUpdated, newsItems }: {
   matches: Match[];
   now: number;
   liveScores: Map<number, LiveScore>;
   lastUpdated: number | null;
+  newsItems: NewsItem[];
 }) {
   const [tick, setTick] = useState(0);
 
@@ -434,7 +437,14 @@ function LiveTicker({ matches, now, liveScores, lastUpdated }: {
     }
   }
 
-  // State 2 — last updated
+  // State 2 — top BBC headline
+  const headline = newsItems[0]?.title;
+  if (headline) {
+    const short = headline.length > 50 ? headline.slice(0, 49).replace(/\s\S*$/, '') + '…' : headline;
+    states.push(short.toUpperCase());
+  }
+
+  // State 3 — last updated
   if (lastUpdated) {
     const d   = new Date(lastUpdated);
     const pad = (n: number) => String(n).padStart(2, '0');
