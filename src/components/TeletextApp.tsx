@@ -1,13 +1,13 @@
 // TeletextApp.tsx — TV chassis, remote control, page router, keyboard handling
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { loadMatches, TZ, TZ_ORDER } from '../lib/dataUtils';
-import { fetchLiveScores, fetchNewsHeadlines } from '../lib/liveData';
+import { fetchLiveScores, fetchNewsHeadlines, isMatchLive } from '../lib/liveData';
 import type { Match, TZKey, PageId, PageConfig, LiveScore, NewsItem } from '../lib/types';
 import {
   NewsPage, FixturesPage, ResultsPage,
   GroupsPage, GroupDetailPage, MatchReviewPage,
 } from './TeletextViews';
-import { groupStandings } from '../lib/teletextData';
+import { groupStandings, topScorers } from '../lib/teletextData';
 
 // ── Page registry ──────────────────────────────────────────────────────────
 const PAGES: Record<string, PageConfig> = {
@@ -41,20 +41,22 @@ export default function TeletextApp() {
   const [typed,            setTyped]            = useState('');
   const [liveScores,       setLiveScores]       = useState<Map<number, LiveScore>>(new Map());
   const [newsItems,        setNewsItems]        = useState<NewsItem[]>([]);
+  const [lastUpdated,      setLastUpdated]      = useState<number | null>(null);
+  const [isMobile,         setIsMobile]         = useState(() => window.innerWidth < 768);
   const stageRef = useRef<HTMLDivElement>(null);
 
   // Load matches then immediately fetch live scores
   useEffect(() => {
     loadMatches().then(m => {
       setMatches(m);
-      fetchLiveScores(m).then(setLiveScores);
+      fetchLiveScores(m).then(scores => { setLiveScores(scores); setLastUpdated(Date.now()); });
     });
   }, []);
 
   // Poll live scores every 5 min
   useEffect(() => {
     if (!matches) return;
-    const id = setInterval(() => fetchLiveScores(matches).then(setLiveScores), 5 * 60 * 1000);
+    const id = setInterval(() => fetchLiveScores(matches).then(scores => { setLiveScores(scores); setLastUpdated(Date.now()); }), 5 * 60 * 1000);
     return () => clearInterval(id);
   }, [matches]);
 
@@ -77,13 +79,19 @@ export default function TeletextApp() {
     return () => clearInterval(id);
   }, []);
 
-  // Scale TV stage to fit viewport
+  // Scale TV stage to fit viewport (desktop only); track mobile breakpoint
   useEffect(() => {
     const fit = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
       const el = stageRef.current;
       if (!el) return;
-      const s = Math.min(window.innerWidth / 1640, window.innerHeight / 1020);
-      el.style.setProperty('--scale', String(s));
+      if (mobile) {
+        el.style.removeProperty('--scale');
+      } else {
+        const s = Math.min(window.innerWidth / 1640, window.innerHeight / 1020);
+        el.style.setProperty('--scale', String(s));
+      }
     };
     fit();
     window.addEventListener('resize', fit);
@@ -146,7 +154,7 @@ export default function TeletextApp() {
 
   return (
     <div className="app">
-      <div className="tv-stage" ref={stageRef}>
+      <div className={`tv-stage${isMobile ? ' tv-stage--mobile' : ''}`} ref={stageRef}>
         <div className="tv">
 
           {/* ── Screen bay ── */}
@@ -193,6 +201,10 @@ export default function TeletextApp() {
             switchPage={switchPage}
             viewer={viewer}
             setViewer={setViewer}
+            matches={matches ?? []}
+            now={now}
+            liveScores={liveScores}
+            lastUpdated={lastUpdated}
           />
         </div>
       </div>
@@ -291,7 +303,7 @@ function TrophyMosaic() {
 }
 
 // ─── Remote control ────────────────────────────────────────────────────────
-function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setViewer }: {
+function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setViewer, matches, now, liveScores, lastUpdated }: {
   page: PageConfig;
   typed: string;
   typeDigit: (d: string) => void;
@@ -299,6 +311,10 @@ function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setVie
   switchPage: (id: PageId) => void;
   viewer: TZKey;
   setViewer: (z: TZKey) => void;
+  matches: Match[];
+  now: number;
+  liveScores: Map<number, LiveScore>;
+  lastUpdated: number | null;
 }) {
   return (
     <div className="rmt">
@@ -362,11 +378,78 @@ function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setVie
         <button className="rmt__sm">►►</button>
       </div>
 
-      {/* Brand foot */}
+      {/* Brand foot — live ticker */}
       <div className="rmt__foot">
-        <span>.monks</span>
+        <LiveTicker matches={matches} now={now} liveScores={liveScores} lastUpdated={lastUpdated} />
         <span className="rmt__pwr"></span>
       </div>
     </div>
+  );
+}
+
+// ─── Live ticker (rotates every 4 s in the remote footer) ─────────────────
+function LiveTicker({ matches, now, liveScores, lastUpdated }: {
+  matches: Match[];
+  now: number;
+  liveScores: Map<number, LiveScore>;
+  lastUpdated: number | null;
+}) {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 4000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Build the rotation states
+  const states: string[] = [];
+
+  // State 0 — match status
+  const liveMatches = matches.filter(m => isMatchLive(m.num, m.kickoffUTC, now, liveScores));
+  if (liveMatches.length > 0) {
+    states.push(`● ${liveMatches.length} LIVE NOW`);
+  } else {
+    const next = matches.find(m => m.kickoffUTC > now);
+    if (next) {
+      const diffS  = Math.floor((next.kickoffUTC - now) / 1000);
+      const days   = Math.floor(diffS / 86400);
+      const hours  = Math.floor((diffS % 86400) / 3600);
+      const pad    = (n: number) => String(n).padStart(2, '0');
+      states.push(days > 0 ? `NEXT IN ${days}D ${pad(hours)}H` : `NEXT IN ${pad(hours)}H ${pad(Math.floor((diffS % 3600) / 60))}M`);
+    } else {
+      states.push('TOURNAMENT COMPLETE');
+    }
+  }
+
+  // State 1 — top scorer or next fixture
+  const scorers = topScorers(matches, now, 1, liveScores);
+  if (scorers.length > 0 && scorers[0]!.goals > 0) {
+    const s = scorers[0]!;
+    const surname = s.name.split(' ').pop() ?? s.name;
+    states.push(`⚽ ${surname.toUpperCase()} ${s.goals} GOAL${s.goals === 1 ? '' : 'S'}`);
+  } else {
+    const next = matches.find(m => m.kickoffUTC > now);
+    if (next) {
+      states.push(`${next.teams[0]!.short} v ${next.teams[1]!.short}`);
+    }
+  }
+
+  // State 2 — last updated
+  if (lastUpdated) {
+    const d   = new Date(lastUpdated);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    states.push(`UPDATED ${pad(d.getHours())}:${pad(d.getMinutes())}`);
+  }
+
+  if (states.length === 0) return <span className="rmt__ticker">WC2026</span>;
+
+  const label = states[tick % states.length]!;
+  const isLive = label.startsWith('●');
+
+  return (
+    <span className="rmt__ticker">
+      {isLive && <span className="rmt__ticker__dot">● </span>}
+      {isLive ? label.slice(2) : label}
+    </span>
   );
 }

@@ -525,7 +525,6 @@ html, body, #root {
 .gd__stand__head { color: var(--tt-cyan); font-size: 18px; letter-spacing: 0.05em; border-bottom: 2px solid var(--tt-green); padding-bottom: 4px; }
 .gd__stand__row  { color: var(--tt-white); }
 .gd__stand__row.qual { color: var(--tt-yellow); }
-.gd__stand__row.qual .pos::before { content: "▲ "; color: var(--tt-green); }
 .gd__stand__row.elim { color: var(--tt-dim); }
 .gd__stand__row .pts { color: var(--tt-yellow); font-weight: 700; text-align: right; }
 .gd__fix { font-size: 20px; line-height: 1.2; overflow: hidden; }
@@ -533,3 +532,161 @@ html, body, #root {
 .gd__fix__row:hover { background: rgba(43,242,255,0.06); }
 .grp__drill { display: block; background: var(--tt-yellow); color: var(--tt-black); border: 0; padding: 6px 8px; font-family: var(--font-tt); font-size: 18px; letter-spacing: 0.04em; margin-top: 10px; cursor: pointer; text-align: center; width: 100%; }
 .grp__drill:hover { background: var(--tt-white); }
+
+/* ──── News "read more" hint ──── */
+.news__read-more { font-size: 16px; margin-top: 4px; letter-spacing: 0.06em; opacity: 0.8; }
+
+/* ──── News article drawer ──── */
+.news__drawer {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.78);
+  display: flex; align-items: flex-end;
+  z-index: 100;
+  animation: drawer-bg-in 0.2s ease forwards;
+}
+.news__drawer__panel {
+  width: 100%;
+  background: #030b10;
+  border-top: 3px solid var(--tt-cyan);
+  padding: 18px 26px 22px;
+  font-family: var(--font-tt);
+  animation: drawer-slide-up 0.25s ease forwards;
+  max-height: 72%;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.news__drawer__kicker { font-size: 18px; letter-spacing: 0.1em; }
+.news__drawer__title  { font-size: 26px; line-height: 1.1; }
+.news__drawer__body   { font-size: 20px; line-height: 1.35; }
+.news__drawer__link   { display: inline-block; font-size: 20px; margin-top: 4px; text-decoration: none; letter-spacing: 0.04em; border-bottom: 1px solid var(--tt-cyan); padding-bottom: 2px; }
+.news__drawer__link:hover { color: var(--tt-white); border-color: var(--tt-white); }
+.news__drawer__close  { align-self: flex-start; background: none; border: none; font-family: var(--font-tt); font-size: 20px; cursor: pointer; padding: 0; margin-top: 8px; letter-spacing: 0.06em; }
+.news__drawer__close:hover { opacity: 0.7; }
+@keyframes drawer-slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes drawer-bg-in    { from { background: rgba(0,0,0,0); }   to { background: rgba(0,0,0,0.78); } }
+
+/* ──── Remote footer ticker ──── */
+.rmt__ticker { font-size: 13px; letter-spacing: 0.05em; color: #d0cec7; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 210px; font-family: "Silkscreen", var(--font-tt); }
+.rmt__ticker__dot { color: var(--tt-red); animation: blink 1s steps(2) infinite; }
+
+/* ──── Mobile layout (≤767px) — stacked TV ──── */
+@media (max-width: 767px) {
+  html, body, #root { overflow: auto; height: 100%; }
+
+  /* Fill the full viewport height; distribute screen vs remote via flex */
+  .app {
+    position: relative; inset: auto;
+    display: flex; flex-direction: column;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .tv-stage--mobile {
+    position: relative;
+    left: auto; top: auto;
+    transform: none !important;
+    width: 100%;
+    flex: 1;                   /* expand to fill viewport */
+    display: flex; flex-direction: column;
+  }
+
+  /* TV chassis: flex column so screen + remote share full height */
+  .tv {
+    display: flex !important;  /* override desktop grid */
+    flex-direction: column;
+    flex: 1;
+    height: auto;
+    padding: 10px 10px 0;
+    gap: 0;
+    border-radius: 8px 8px 0 0;
+  }
+
+  /* Hide brand sticker + LED — they rely on fixed px positions */
+  .tv::before, .tv::after { display: none; }
+
+  /* Screen bay: doesn't grow — fixed by content + aspect ratio */
+  .tv__screen-bay {
+    flex: 0 0 auto;
+    padding: 10px;
+    border-radius: 10px;
+  }
+
+  /* Portrait aspect ratio — taller screen shows full table rows */
+  .tv__bezel {
+    padding: 8px;
+    border-radius: 14px;
+    aspect-ratio: 3 / 4;
+  }
+
+  .crt { border-radius: 12px / 8px; }
+
+  /* Body text: readable at ~15px on a 375px phone */
+  .tt {
+    padding: 8px 12px 6px;
+    font-size: clamp(13px, 4vw, 30px);
+    line-height: 1.12;
+  }
+
+  /* Status bar — slightly tighter */
+  .tt__bar { font-size: clamp(10px, 2.8vw, 22px); gap: 4px; flex-wrap: nowrap; }
+  .tt__bar .tz { display: none; }   /* TZ is on the remote instead */
+  .tt__bar .when { white-space: nowrap; }
+
+  /* Masthead */
+  .tt__head { padding: 2px 0; }
+  .tt__title { font-size: clamp(16px, 4.8vw, 38px) !important; }
+  .tt__sub { font-size: clamp(11px, 3.2vw, 26px); }
+
+  /* Fastext label bar */
+  .tt__fastext button { font-size: clamp(10px, 2.8vw, 20px); padding: 2px 4px; }
+
+  /* News page */
+  .news__hero { padding-bottom: 4px; }
+  .news__title { font-size: clamp(15px, 4.5vw, 28px); }
+  .news__body  { font-size: clamp(13px, 3.8vw, 22px); }
+  .news__sub   { font-size: clamp(13px, 3.8vw, 22px); }
+  .news__grid  { grid-template-columns: 1fr; gap: 8px; }
+  .news__countdown { font-size: clamp(20px, 6.5vw, 38px); }
+
+  /* Group detail — shrink the giant letter so the table fits */
+  .gd__letter { font-size: clamp(40px, 14vw, 110px); padding: 4px 0; }
+  .gd__head   { grid-template-columns: clamp(60px, 18vw, 140px) 1fr; gap: 10px; }
+  .gd__title  { font-size: clamp(16px, 5vw, 30px); }
+  .gd__teams  { font-size: clamp(14px, 4vw, 24px); margin-top: 3px; }
+  .gd__stand  { font-size: clamp(13px, 3.8vw, 22px); }
+  .gd__stand__head,
+  .gd__stand__row { grid-template-columns: 22px 1fr 26px 26px 26px 26px 30px 30px 32px 32px; gap: 3px; font-size: clamp(12px, 3.4vw, 22px); }
+
+  /* Remote: flex: 1 fills all remaining height below the screen */
+  .rmt {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 10px;
+    padding: 12px 14px 16px;
+    border-radius: 0 0 8px 8px;
+    grid-template-rows: none;   /* suppress desktop grid */
+    justify-content: space-between;
+  }
+
+  /* hide decorative / keyboard sections */
+  .rmt__brand,
+  .rmt__display,
+  .rmt__keypad,
+  .rmt__transport { display: none; }
+
+  /* fastext — tall, easy-to-tap buttons */
+  .rmt__fastext__lbl { font-size: 9px; letter-spacing: 0.08em; }
+  .rmt__fastext__row { gap: 10px; }
+  .rmt__fxbtn { height: 52px; border-radius: 8px; }
+  .rmt__fxbtn .dot { width: 22px; height: 22px; }
+
+  /* TZ — single row of 8, generous height */
+  .rmt__tz__lbl { font-size: 9px; letter-spacing: 0.08em; }
+  .rmt__tz__row { grid-template-columns: repeat(8, 1fr); gap: 5px; }
+  .rmt__tzbtn { height: 38px; font-size: 9px; }
+
+  /* footer ticker */
+  .rmt__foot { font-size: 12px; padding: 8px 12px; border-radius: 4px; }
+  .rmt__ticker { font-size: 12px; max-width: none; flex: 1; }
+}

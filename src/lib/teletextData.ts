@@ -1,7 +1,7 @@
 // teletextData.ts — group standings, scorers, narratives, headlines.
 // TypeScript port of teletext-data.js from the design prototype.
 
-import { TZ, formatTime, formatDay } from './dataUtils';
+import { TZ, formatTime } from './dataUtils';
 import { resolveScore, isMatchFinished, isMatchLive } from './liveData';
 import type {
   Match, StandingRow, GroupResult,
@@ -232,6 +232,7 @@ export function headlines(
       kind: 'news', kicker: 'LATEST NEWS',
       title: item.title.toUpperCase().slice(0, 72),
       body:  item.description.slice(0, 180),
+      link:  item.link,
     });
   } else {
     const recent  = played.slice().reverse();
@@ -255,18 +256,7 @@ export function headlines(
     }
   }
 
-  // 2. Next big match
-  const nextBig = upcoming.find(m => m.stageId !== 'group') ?? upcoming[0];
-  if (nextBig) {
-    result.push({
-      kind: 'preview', kicker: 'COMING UP',
-      title: `${nextBig.teams[0].name.toUpperCase()} v ${nextBig.teams[1].name.toUpperCase()}`,
-      body:  `${nextBig.stage} at ${nextBig.venue}. Kick-off ${formatTime(nextBig.kickoffUTC, viewer)} ${TZ[viewer]?.code ?? ''}, ${formatDay(nextBig.kickoffUTC, viewer)}.`,
-      match: nextBig,
-    });
-  }
-
-  // 3. Tightest group
+  // 2. Tightest group
   const standings = groupStandings(matches, nowMs, liveScores);
   let tightest: string | null = null, tightestSpread = 99;
   for (const [g, rows] of Object.entries(standings)) {
@@ -292,6 +282,21 @@ export function headlines(
       kind: 'scorer', kicker: 'GOLDEN BOOT',
       title: `${s.name.toUpperCase()} (${s.team}) LEADS THE RACE`,
       body:  `${s.goals} goal${s.goals === 1 ? '' : 's'} so far — front of the queue for the Golden Boot, with the knockout rounds still to come.`,
+    });
+  }
+
+  // Fill any remaining grid slots with additional BBC news items.
+  // Pre-tournament: GROUPS and GOLDEN BOOT slots are empty — real news fills them.
+  // During tournament: only fills if <3 grid items were generated from match data.
+  const usedNewsItems = result[0]?.kind === 'news' ? 1 : 0;
+  let newsIdx = usedNewsItems;
+  while (result.length < 4 && newsIdx < newsItems.length) {
+    const item = newsItems[newsIdx++]!;
+    result.push({
+      kind: 'news', kicker: 'IN THE NEWS',
+      title: item.title.toUpperCase().slice(0, 72),
+      body:  item.description.slice(0, 110),
+      link:  item.link,
     });
   }
 

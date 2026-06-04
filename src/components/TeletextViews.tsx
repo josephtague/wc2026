@@ -6,7 +6,7 @@ import {
 } from '../lib/dataUtils';
 import { resolveScore, isMatchFinished, isMatchLive } from '../lib/liveData';
 import { fullResult, narrative, groupStandings, groupResults, topScorers, headlines } from '../lib/teletextData';
-import type { Match, TZKey, PageId, LiveScore, NewsItem } from '../lib/types';
+import type { Match, TZKey, PageId, LiveScore, NewsItem, Headline } from '../lib/types';
 
 // ── Shared props types ─────────────────────────────────────────────────────
 interface BaseProps {
@@ -28,17 +28,27 @@ export function NewsPage({ matches, now, viewer, liveScores, newsItems, switchPa
   const hl      = useMemo(() => headlines(matches, now, viewer, liveScores, newsItems), [matches, now, viewer, liveScores, newsItems]);
   const scorers = useMemo(() => topScorers(matches, now, 6, liveScores), [matches, now, liveScores]);
   const nextMatch = useMemo(() => matches.find(m => m.kickoffUTC > now), [matches, now]);
+  const [drawerItem, setDrawerItem] = useState<Headline | null>(null);
 
   const trim = (s: string, n: number) => s.length <= n ? s : s.slice(0, n - 1).replace(/\s\S*$/, '') + '…';
 
+  const handleHeadlineClick = (h: Headline) => {
+    if (h.kind === 'news')   { setDrawerItem(h); return; }
+    if (h.match)             { setSelectedMatchNum(h.match.num); switchPage('review'); }
+    if (h.groupName)         { setFocusedGroup(h.groupName);     switchPage('groupdet'); }
+  };
+
   return (
     <div className="tt__body news">
-      <div className="news__hero">
+      <div className="news__hero"
+        onClick={() => hl[0] && handleHeadlineClick(hl[0])}
+        style={{ cursor: hl[0]?.kind === 'news' ? 'pointer' : 'default' }}>
         <span className="news__kick c-r">★ HEADLINE</span>
         {hl[0] && (
           <>
             <div className="news__title c-y">{hl[0].title}</div>
             <div className="news__body c-c">{trim(hl[0].body, 180)}</div>
+            {hl[0].kind === 'news' && <div className="news__read-more c-g">▸ TAP TO READ MORE</div>}
           </>
         )}
       </div>
@@ -47,11 +57,8 @@ export function NewsPage({ matches, now, viewer, liveScores, newsItems, switchPa
         <div className="news__col">
           {hl.slice(1).map((h, i) => (
             <div key={i} className="news__item"
-              onClick={() => {
-                if (h.match)     { setSelectedMatchNum(h.match.num); switchPage('review'); }
-                if (h.groupName) { setFocusedGroup(h.groupName);     switchPage('groupdet'); }
-              }}
-              style={{ cursor: (h.match || h.groupName) ? 'pointer' : 'default' }}>
+              onClick={() => handleHeadlineClick(h)}
+              style={{ cursor: (h.kind === 'news' || h.match || h.groupName) ? 'pointer' : 'default' }}>
               <div className="news__kick c-g">▸ {h.kicker}</div>
               <div className="news__sub c-y">{h.title}</div>
               <div className="news__body c-w">{trim(h.body, 110)}</div>
@@ -90,6 +97,28 @@ export function NewsPage({ matches, now, viewer, liveScores, newsItems, switchPa
             ))}
           </div>
         </div>
+      </div>
+
+      <NewsDrawer item={drawerItem} onClose={() => setDrawerItem(null)} />
+    </div>
+  );
+}
+
+// ── News article drawer ────────────────────────────────────────────────────
+function NewsDrawer({ item, onClose }: { item: Headline | null; onClose: () => void }) {
+  if (!item) return null;
+  return (
+    <div className="news__drawer" onClick={onClose}>
+      <div className="news__drawer__panel" onClick={e => e.stopPropagation()}>
+        <div className="news__drawer__kicker c-g">▸ {item.kicker}</div>
+        <div className="news__drawer__title c-y">{item.title}</div>
+        <div className="news__drawer__body c-w">{item.body}</div>
+        {item.link && (
+          <a className="news__drawer__link c-c" href={item.link} target="_blank" rel="noreferrer">
+            ► READ FULL STORY ON BBC SPORT
+          </a>
+        )}
+        <button className="news__drawer__close c-r" onClick={onClose}>✕ CLOSE</button>
       </div>
     </div>
   );

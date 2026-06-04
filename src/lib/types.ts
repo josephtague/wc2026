@@ -121,6 +121,7 @@ export interface Headline {
   body: string;
   match?: Match;
   groupName?: string;
+  link?: string;       // external URL (BBC Sport articles only)
 }
 
 export type PageId = 'news' | 'fixtures' | 'results' | 'groups' | 'groupdet' | 'review';
