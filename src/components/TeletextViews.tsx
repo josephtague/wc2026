@@ -284,8 +284,7 @@ export function GroupsPage({ matches, now, liveScores, focusedGroup, setFocusedG
               const played  = Math.floor(rows.reduce((acc, r) => acc + r.p, 0) / 2);
               return (
                 <div key={g} className="grp__card"
-                  onClick={() => setFocusedGroup(g)}
-                  onDoubleClick={() => { setFocusedGroup(g); switchPage('groupdet'); }}
+                  onClick={() => { setFocusedGroup(g); switchPage('groupdet'); }}
                   style={{ cursor: 'pointer', outline: isFocus ? '1px dashed var(--tt-yellow)' : 'none', outlineOffset: 4 }}>
                   <div className="grp__title">
                     <span className="grp__letter">GP {letter}</span>
@@ -336,11 +335,17 @@ export function GroupsPage({ matches, now, liveScores, focusedGroup, setFocusedG
 // ─────────────────────────────────────────────────────────────────────
 // P151  GROUP DETAIL
 // ─────────────────────────────────────────────────────────────────────
-export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup, setSelectedMatchNum, switchPage }: BaseProps) {
+const ALL_GROUPS = ['Group A','Group B','Group C','Group D','Group E','Group F',
+                    'Group G','Group H','Group I','Group J','Group K','Group L'];
+
+export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup, setFocusedGroup, setSelectedMatchNum, switchPage }: BaseProps) {
   const g        = focusedGroup || 'Group A';
   const standings = useMemo(() => groupStandings(matches, now, liveScores)[g] ?? [], [matches, now, liveScores, g]);
   const fixtures  = useMemo(() => groupResults(matches, g, now, liveScores), [matches, g, now, liveScores]);
   const letter    = g.replace('Group ', '');
+  const idx       = ALL_GROUPS.indexOf(g);
+  const prevGroup = () => setFocusedGroup(ALL_GROUPS[(idx - 1 + ALL_GROUPS.length) % ALL_GROUPS.length]);
+  const nextGroup = () => setFocusedGroup(ALL_GROUPS[(idx + 1) % ALL_GROUPS.length]);
 
   return (
     <div className="tt__body">
@@ -391,6 +396,12 @@ export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup
               <span className="c-dim">{m.city}</span>
             </div>
           ))}
+        </div>
+
+        <div className="gd__nav">
+          <button onClick={prevGroup}>◄ PREV</button>
+          <span className="gd__nav__label">{g.toUpperCase()}</span>
+          <button onClick={nextGroup}>NEXT ►</button>
         </div>
       </div>
     </div>
