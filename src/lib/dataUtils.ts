@@ -11,7 +11,6 @@ export const TZ: Record<TZKey, TZInfo> = {
   CDM: { key: 'CDM', label: 'Mexico City',  code: 'CST',  offsetHrs: -6   },
   ET:  { key: 'ET',  label: 'New York',     code: 'EDT',  offsetHrs: -4   },
   BRT: { key: 'BRT', label: 'São Paulo',    code: 'BRT',  offsetHrs: -3   },
-  ART: { key: 'ART', label: 'Buenos Aires', code: 'ART',  offsetHrs: -3   },
   LDN: { key: 'LDN', label: 'London',       code: 'BST',  offsetHrs:  1   },
   PAR: { key: 'PAR', label: 'Madrid/Paris', code: 'CEST', offsetHrs:  2   },
   DXB: { key: 'DXB', label: 'Dubai',        code: 'GST',  offsetHrs:  4   },
@@ -19,11 +18,11 @@ export const TZ: Record<TZKey, TZInfo> = {
   TYO: { key: 'TYO', label: 'Tokyo',        code: 'JST',  offsetHrs:  9   },
   SYD: { key: 'SYD', label: 'Sydney',       code: 'AEST', offsetHrs: 10   },
 };
-export const TZ_ORDER: TZKey[] = ['PT', 'CDM', 'ET', 'BRT', 'ART', 'LDN', 'PAR', 'DXB', 'SHA', 'TYO', 'SYD'];
+export const TZ_ORDER: TZKey[] = ['PT', 'CDM', 'ET', 'BRT', 'LDN', 'PAR', 'DXB', 'SHA', 'TYO', 'SYD'];
 
 /** Short city labels for TZ buttons — consistent city names, west→east */
 export const TZ_CITY: Record<TZKey, string> = {
-  PT: 'LA', CDM: 'CDMX', ET: 'NY', BRT: 'SAO', ART: 'BUE',
+  PT: 'LA', CDM: 'CDMX', ET: 'NY', BRT: 'SAO',
   LDN: 'LON', PAR: 'PAR', DXB: 'DXB', SHA: 'SHA', TYO: 'TYO', SYD: 'SYD',
 };
 

@@ -5,8 +5,8 @@ import {
   inTz, WK, MO,
 } from '../lib/dataUtils';
 import { resolveScore, isMatchFinished, isMatchLive } from '../lib/liveData';
-import { fullResult, narrative, groupStandings, groupResults, topScorers, headlines } from '../lib/teletextData';
-import type { Match, TZKey, PageId, LiveScore, NewsItem, Headline } from '../lib/types';
+import { fullResult, narrative, groupStandings, groupResults, headlines } from '../lib/teletextData';
+import type { Match, TZKey, PageId, LiveScore, NewsItem, Headline, TopScorer } from '../lib/types';
 
 // ── Shared props types ─────────────────────────────────────────────────────
 interface BaseProps {
@@ -15,18 +15,21 @@ interface BaseProps {
   viewer: TZKey;
   liveScores: Map<number, LiveScore>;
   newsItems: NewsItem[];
+  scorers: TopScorer[];
   switchPage: (id: PageId) => void;
   setSelectedMatchNum: (n: number) => void;
   setFocusedGroup: (g: string) => void;
   focusedGroup: string;
+  selectedPreviewNum: number | null;
+  setSelectedPreviewNum: (n: number) => void;
+  isMobile: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────
 // P100  NEWS HEADLINES
 // ─────────────────────────────────────────────────────────────────────
-export function NewsPage({ matches, now, viewer, liveScores, newsItems, switchPage, setSelectedMatchNum, setFocusedGroup }: BaseProps) {
-  const hl      = useMemo(() => headlines(matches, now, liveScores, newsItems), [matches, now, liveScores, newsItems]);
-  const scorers = useMemo(() => topScorers(matches, now, 6, liveScores), [matches, now, liveScores]);
+export function NewsPage({ matches, now, viewer, liveScores, newsItems, scorers, switchPage, setSelectedMatchNum, setFocusedGroup }: BaseProps) {
+  const hl = useMemo(() => headlines(matches, now, liveScores, newsItems, scorers), [matches, now, liveScores, newsItems, scorers]);
   const nextMatch = useMemo(() => matches.find(m => m.kickoffUTC > now), [matches, now]);
   const [drawerItem, setDrawerItem] = useState<Headline | null>(null);
 
@@ -139,23 +142,25 @@ function Countdown({ to, now }: { to: number; now: number }) {
 // ─────────────────────────────────────────────────────────────────────
 // P140  UPCOMING FIXTURES
 // ─────────────────────────────────────────────────────────────────────
-export function FixturesPage({ matches, now, viewer, liveScores }: BaseProps) {
+export function FixturesPage({ matches, now, viewer, liveScores, switchPage, setSelectedPreviewNum, isMobile }: BaseProps) {
   const upcoming = useMemo(
     () => matches.filter(m => !isMatchFinished(m.num, m.kickoffUTC, now, liveScores)),
     [matches, now, liveScores],
   );
-  return <FixturesOrResults rows={upcoming} viewer={viewer} liveScores={liveScores} showResults={false} now={now} />;
+  return <FixturesOrResults rows={upcoming} viewer={viewer} liveScores={liveScores} showResults={false} now={now}
+    switchPage={switchPage} setSelectedPreviewNum={setSelectedPreviewNum} isMobile={isMobile} />;
 }
 
 // ─────────────────────────────────────────────────────────────────────
 // P141  RESULTS
 // ─────────────────────────────────────────────────────────────────────
-export function ResultsPage({ matches, now, viewer, liveScores }: BaseProps) {
+export function ResultsPage({ matches, now, viewer, liveScores, switchPage, setSelectedPreviewNum, isMobile }: BaseProps) {
   const played = useMemo(
     () => matches.filter(m => isMatchFinished(m.num, m.kickoffUTC, now, liveScores)).slice().reverse(),
     [matches, now, liveScores],
   );
-  return <FixturesOrResults rows={played} viewer={viewer} liveScores={liveScores} showResults now={now} />;
+  return <FixturesOrResults rows={played} viewer={viewer} liveScores={liveScores} showResults now={now}
+    switchPage={switchPage} setSelectedPreviewNum={setSelectedPreviewNum} isMobile={isMobile} />;
 }
 
 // Shared list renderer
@@ -165,8 +170,11 @@ interface FORProps {
   liveScores: Map<number, LiveScore>;
   showResults: boolean;
   now: number;
+  switchPage: (id: PageId) => void;
+  setSelectedPreviewNum: (n: number) => void;
+  isMobile: boolean;
 }
-function FixturesOrResults({ rows, viewer, liveScores, showResults, now }: FORProps) {
+function FixturesOrResults({ rows, viewer, liveScores, showResults, now, switchPage, setSelectedPreviewNum, isMobile }: FORProps) {
   const days = useMemo(() => {
     const map = new Map<string, { key: string; label: string; matches: Match[] }>();
     rows.forEach(m => {
@@ -201,6 +209,11 @@ function FixturesOrResults({ rows, viewer, liveScores, showResults, now }: FORPr
         <div className="fix__card__meta">
           {stageShort}{m.city ? ` · ${m.city}` : ''}
         </div>
+        {!finished && !live && (
+          <button className="fix__card__preview c-g"
+            onClick={() => { setSelectedPreviewNum(m.num); switchPage('preview'); }}
+            title="Match preview">{isMobile ? '►' : '► PREVIEW'}</button>
+        )}
       </div>
     );
   };
@@ -222,7 +235,7 @@ function FixturesOrResults({ rows, viewer, liveScores, showResults, now }: FORPr
 // ─────────────────────────────────────────────────────────────────────
 // P150  GROUP TABLES
 // ─────────────────────────────────────────────────────────────────────
-export function GroupsPage({ matches, now, liveScores, focusedGroup, setFocusedGroup, switchPage }: BaseProps) {
+export function GroupsPage({ matches, now, liveScores, focusedGroup, setFocusedGroup, switchPage, isMobile }: BaseProps) {
   const standings    = useMemo(() => groupStandings(matches, now, liveScores), [matches, now, liveScores]);
   const groupNames   = Object.keys(standings);
   const focus        = focusedGroup || groupNames[0] || 'Group A';
@@ -240,7 +253,10 @@ export function GroupsPage({ matches, now, liveScores, focusedGroup, setFocusedG
               const played  = Math.floor(rows.reduce((acc, r) => acc + r.p, 0) / 2);
               return (
                 <div key={g} className="grp__card"
-                  onClick={() => { setFocusedGroup(g); switchPage('groupdet'); }}
+                  // Desktop: single-click focuses the H2H panel, double-click drills in.
+                  // Mobile: the H2H panel is hidden, so a tap drills straight into group detail.
+                  onClick={() => { if (isMobile) { setFocusedGroup(g); switchPage('groupdet'); } else { setFocusedGroup(g); } }}
+                  onDoubleClick={() => { setFocusedGroup(g); switchPage('groupdet'); }}
                   style={{ cursor: 'pointer', outline: isFocus ? '1px dashed var(--tt-yellow)' : 'none', outlineOffset: 4 }}>
                   <div className="grp__title">
                     <span className="grp__letter">GP {letter}</span>
@@ -424,11 +440,17 @@ export function MatchReviewPage({ matches, now, viewer, liveScores, selectedMatc
         </div>
 
         <div className="mr__stats">
-          <Stat label="POSSESSION" h={`${r.stats.possession[0]}%`} a={`${r.stats.possession[1]}%`} barPct={r.stats.possession[0]} />
-          <Stat label="SHOTS"   h={r.stats.shots[0]}   a={r.stats.shots[1]} />
-          <Stat label="CORNERS" h={r.stats.corners[0]} a={r.stats.corners[1]} />
-          <Stat label="YELLOWS" h={r.stats.yellow[0]}  a={r.stats.yellow[1]} />
-          <Stat label="ATT." h={r.attendance.toLocaleString()} a="" wide />
+          {r.stats ? (
+            <>
+              <Stat label="POSSESSION" h={`${r.stats.possession[0]}%`} a={`${r.stats.possession[1]}%`} barPct={r.stats.possession[0]} />
+              <Stat label="SHOTS"   h={r.stats.shots[0]}   a={r.stats.shots[1]} />
+              <Stat label="CORNERS" h={r.stats.corners[0]} a={r.stats.corners[1]} />
+              <Stat label="YELLOWS" h={r.stats.yellow[0]}  a={r.stats.yellow[1]} />
+            </>
+          ) : (
+            <div className="mr__stat__none c-dim">► DETAILED MATCH STATS UNAVAILABLE</div>
+          )}
+          {r.attendance != null && <Stat label="ATT." h={r.attendance.toLocaleString()} a="" wide />}
         </div>
 
         <div className="mr__picker">

@@ -4,112 +4,21 @@
 import { resolveScore, isMatchFinished, isMatchLive } from './liveData';
 import type {
   Match, StandingRow, GroupResult,
-  TopScorer, Headline, FullResult, ScorerEntry, LiveScore, NewsItem,
+  TopScorer, Headline, FullResult, LiveScore, NewsItem,
 } from './types';
 
-// ── Player surname pools by nation ─────────────────────────────────────────
-const SURNAMES: Record<string, string[]> = {
-  'Mexico':        ['Lozano','Gimenez','Alvarez','Vasquez','Antuna'],
-  'South Africa':  ['Mokoena','Foster','Williams','Ntcham','Zwane'],
-  'South Korea':   ['Son','Hwang','Lee','Kim','Cho'],
-  'Czech Republic':['Schick','Soucek','Kuchta','Chytil','Hlozek'],
-  'Canada':        ['David','Davies','Larin','Buchanan','Eustaquio'],
-  'USA':           ['Pulisic','Reyna','Pepi','Balogun','Weah'],
-  'United States': ['Pulisic','Reyna','Pepi','Balogun','Weah'],
-  'England':       ['Kane','Bellingham','Saka','Foden','Palmer'],
-  'France':        ['Mbappé','Dembélé','Coman','Thuram','Olise'],
-  'Spain':         ['Yamal','Williams','Olmo','Morata','Pedri'],
-  'Brazil':        ['Vinicius','Rodrygo','Endrick','Raphinha','Neymar'],
-  'Argentina':     ['Messi','Alvarez','Garnacho','Lautaro','Lo Celso'],
-  'Germany':       ['Wirtz','Musiala','Kane','Havertz','Sané'],
-  'Portugal':      ['Ronaldo','Félix','Leão','Bruno F.','Bernardo'],
-  'Netherlands':   ['Gakpo','Depay','Xavi S.','Reijnders','Malen'],
-  'Italy':         ['Retegui','Chiesa','Pellegrini','Frattesi','Scamacca'],
-  'Belgium':       ['Lukaku','De Bruyne','Doku','Trossard','Openda'],
-  'Croatia':       ['Modrić','Kramarić','Petković','Sucic','Pasalic'],
-  'Uruguay':       ['Núñez','Pellistri','Araújo','De Arrascaeta','Valverde'],
-  'Colombia':      ['Díaz','James','Borja','Cuadrado','Lerma'],
-  'Morocco':       ['Hakimi','Ziyech','En-Nesyri','Ounahi','Diaz'],
-  'Senegal':       ['Sarr','Mané','Dia','Diatta','Jackson'],
-  'Japan':         ['Kubo','Mitoma','Ueda','Endo','Doan'],
-  'Switzerland':   ['Embolo','Vargas','Shaqiri','Freuler','Akanji'],
-  'Denmark':       ['Hojlund','Eriksen','Wind','Damsgaard','Bah'],
-  'Australia':     ['Duke','Boyle','Irvine','Goodwin','Mooy'],
-  'Iran':          ['Taremi','Azmoun','Jahanbakhsh','Ghoddos','Ezatolahi'],
-  'Saudi Arabia':  ['Al-Dawsari','Al-Brikan','Al-Buraikan','Kanno','Al-Faraj'],
-  'Ecuador':       ['Caicedo','Sarmiento','Estrada','Plata','Estupiñán'],
-  'Ghana':         ['Kudus','Ayew','Williams','Sulemana','Antoine S.'],
-  'Cameroon':      ['Aboubakar','Choupo-Moting','Anguissa','Onana','Mbeumo'],
-  'Norway':        ['Haaland','Ødegaard','Sørloth','Nusa','Bobb'],
-  'Poland':        ['Lewandowski','Zalewski','Świderski','Frankowski','Buksa'],
-  'Serbia':        ['Mitrović','Vlahović','Tadić','Milinković-S.','Lukić'],
-  'Tunisia':       ['Khazri','Msakni','Slimane','Jebali','Talbi'],
-  'Wales':         ['James','Wilson','Johnson','Moore','Brooks'],
-  'Scotland':      ['McGinn','McTominay','Adams','Christie','Robertson'],
-  'Nigeria':       ['Osimhen','Lookman','Boniface','Chukwueze','Iwobi'],
-  'Ivory Coast':   ['Haller','Krasso','Boga','Pépé','Diakité'],
-  'Paraguay':      ['Sanabria','Almirón','Bareiro','Enciso','González'],
-  'Chile':         ['Sánchez','Vargas','Brereton D.','Aravena','Núñez'],
-  'Sweden':        ['Isak','Gyökeres','Forsberg','Olsson','Karlsson'],
-  'Austria':       ['Arnautović','Sabitzer','Baumgartner','Gregoritsch','Laimer'],
-  'Qatar':         ['Afif','Ali','Muntari','Boudiaf','Madibo'],
-  'New Zealand':   ['Wood','Stamenić','Bell','Garbett','Cacace'],
-  'Turkey':        ['Yilmaz','Akturkoglu','Güler','Yildiz','Yokuslu'],
-  'Algeria':       ['Mahrez','Belaïli','Slimani','Bounedjah','Aouar'],
-  'Egypt':         ['Salah','Mostafa M.','Trezeguet','Marmoush','Hamdi F.'],
-  'Bosnia & Herzegovina': ['Džeko','Demirović','Krunić','Pjanić','Tabaković'],
-  'Panama':        ['Fajardo','Carrasquilla','Yoel B.','Yanis','Murillo'],
-  'Jamaica':       ['Antonio','Bailey','Lowe','Gray','Decordova-R.'],
-  'Cape Verde':    ['Tavares','Andrade','Fortes','Lopes','Mendes'],
-  'DR Congo':      ['Bakambu','Bongonda','Kayembe','Kibango','Luyindama'],
-  'Curacao':       ['Bonevacia','Cijntje','Doran','Koeiman','Martina'],
-  'Uzbekistan':    ['Shomurodov','Tursunov','Jaloliddinov','Boymurodov','Nishonov'],
-  'Jordan':        ['Al-Taamari','Bani-Yaseen','Nasib','Al-Rawabdeh','Abu Zema'],
-  'Haiti':         ['Nazon','Bazile','Dorsainvil','Joseph','Pierre'],
-  'Iraq':          ['Ameen','Al-Buhara','Al-Hamdani','Jasim','Tariq'],
-};
-
-// ── Deterministic hash ─────────────────────────────────────────────────────
-function h32(n: number, salt: number): number {
-  let x = (n * 2654435761 + salt * 374761393) >>> 0;
-  x ^= x >>> 16; x = (x * 2246822507) >>> 0;
-  x ^= x >>> 13; x = (x * 3266489909) >>> 0;
-  x ^= x >>> 16;
-  return x >>> 0;
-}
-
-function teamScorers(teamName: string, count: number, matchNum: number): ScorerEntry[] {
-  const pool = SURNAMES[teamName] ?? [teamName.slice(0, 8)];
-  const out: ScorerEntry[] = [];
-  for (let i = 0; i < count; i++) {
-    const idx = h32(matchNum, i + 1) % pool.length;
-    const minute = (h32(matchNum, i * 7 + 3) % 89) + 1;
-    out.push({ name: pool[idx] ?? teamName.slice(0, 8), minute });
-  }
-  return out.sort((a, b) => a.minute - b.minute);
-}
-
-function syntheticAttendance(matchNum: number): number {
-  return 45000 + (h32(matchNum, 99) % 35000);
-}
-
-// ── Full result with stats ─────────────────────────────────────────────────
+// ── Full result ──────────────────────────────────────────────────────────────
 export function fullResult(m: Match, liveScores: Map<number, LiveScore> = new Map()): FullResult {
-  // Use real score; fall back to 0-0 only as a null-safety guard (network failure edge case)
+  // Use the real confirmed score; 0-0 only as a null-safety guard.
+  // The free football-data.org tier does not expose per-match goal events or
+  // statistics, so we surface ONLY the real score — no fabricated scorers, stats,
+  // or attendance. (Richer detail could later come from API-Football match events.)
   const r = resolveScore(m.num, liveScores) ?? { home: 0, away: 0 };
-  const home = teamScorers(m.teams[0].name, r.home, m.num);
-  const away = teamScorers(m.teams[1].name, r.away, m.num * 7 + 13);
-  const possH = 35 + (h32(m.num, 11) % 30);
   return {
     score: r,
-    scorers: { home, away },
-    stats: {
-      possession: [possH, 100 - possH],
-      shots:      [6 + (h32(m.num, 17) % 14), 5 + (h32(m.num, 23) % 12)],
-      corners:    [2 + (h32(m.num, 29) % 8),  2 + (h32(m.num, 31) % 8)],
-      yellow:     [h32(m.num, 37) % 5,         h32(m.num, 41) % 5],
-    },
-    attendance: syntheticAttendance(m.num),
+    scorers: { home: [], away: [] },
+    stats: null,
+    attendance: null,
   };
 }
 
@@ -188,36 +97,13 @@ export function groupResults(
     });
 }
 
-// ── Tournament-wide top scorers ────────────────────────────────────────────
-export function topScorers(
-  matches: Match[],
-  nowMs: number,
-  limit = 8,
-  liveScores: Map<number, LiveScore> = new Map(),
-): TopScorer[] {
-  const tally = new Map<string, TopScorer>();
-  const bump = (name: string, team: string) => {
-    const k = `${name}|${team}`;
-    if (!tally.has(k)) tally.set(k, { name, team, goals: 0 });
-    tally.get(k)!.goals++;
-  };
-  matches.forEach(m => {
-    if (!isMatchFinished(m.num, m.kickoffUTC, nowMs, liveScores)) return;
-    const r = fullResult(m, liveScores);
-    r.scorers.home.forEach(s => bump(s.name, m.teams[0].short));
-    r.scorers.away.forEach(s => bump(s.name, m.teams[1].short));
-  });
-  return [...tally.values()]
-    .sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name))
-    .slice(0, limit);
-}
-
 // ── News headlines ─────────────────────────────────────────────────────────
 export function headlines(
   matches: Match[],
   nowMs: number,
   liveScores: Map<number, LiveScore> = new Map(),
   newsItems: NewsItem[] = [],
+  scorers: TopScorer[] = [],
 ): Headline[] {
   const played   = matches.filter(m => isMatchFinished(m.num, m.kickoffUTC, nowMs, liveScores));
   const result: Headline[] = [];
@@ -271,9 +157,8 @@ export function headlines(
     });
   }
 
-  // 4. Golden Boot leader
-  const scorers = topScorers(matches, nowMs, 1, liveScores);
-  if (scorers.length) {
+  // 4. Golden Boot leader (real scorers from football-data.org)
+  if (scorers.length && scorers[0]!.goals > 0) {
     const s = scorers[0]!;
     result.push({
       kind: 'scorer', kicker: 'GOLDEN BOOT',

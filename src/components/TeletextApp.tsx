@@ -1,13 +1,14 @@
 // TeletextApp.tsx — TV chassis, remote control, page router, keyboard handling
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { loadMatches, TZ, TZ_ORDER, TZ_CITY } from '../lib/dataUtils';
-import { fetchLiveScores, fetchNewsHeadlines, isMatchLive } from '../lib/liveData';
-import type { Match, TZKey, PageId, PageConfig, LiveScore, NewsItem } from '../lib/types';
+import { fetchLiveScores, fetchNewsHeadlines, fetchScorers, isMatchLive } from '../lib/liveData';
+import type { Match, TZKey, PageId, PageConfig, LiveScore, NewsItem, TopScorer } from '../lib/types';
 import {
   NewsPage, FixturesPage, ResultsPage,
   GroupsPage, GroupDetailPage, MatchReviewPage,
 } from './TeletextViews';
-import { groupStandings, topScorers } from '../lib/teletextData';
+import { PreviewPage } from './PreviewPage';
+import { groupStandings } from '../lib/teletextData';
 
 // ── Page registry ──────────────────────────────────────────────────────────
 const NAV: PageConfig['fastext'] = [
@@ -41,8 +42,15 @@ const PAGES: Record<string, PageConfig> = {
       { c: 'c', label: 'GROUPS',       to: 'groups'   },
     ] },
   '160': { id: 'review',   no: '160', title: 'REPORT',   titleColor: 'is-white',  subRight: 'WORLD CUP 2026', fastext: NAV },
+  '161': { id: 'preview',  no: '161', title: 'PREVIEW',  titleColor: 'is-yellow', subRight: 'WORLD CUP 2026',
+    fastext: [
+      { c: 'r', label: 'NEWS',     to: 'news'     },
+      { c: 'g', label: 'FIXTURES', to: 'fixtures' },
+      { c: 'y', label: 'RESULTS',  to: 'results'  },
+      { c: 'c', label: 'GROUPS',   to: 'groups'   },
+    ] },
 };
-const ID_TO_NO: Record<PageId, string> = { news:'100',fixtures:'140',results:'141',groups:'150',groupdet:'151',review:'160' };
+const ID_TO_NO: Record<PageId, string> = { news:'100',fixtures:'140',results:'141',groups:'150',groupdet:'151',review:'160',preview:'161' };
 
 // ── Main App ───────────────────────────────────────────────────────────────
 export default function TeletextApp() {
@@ -53,26 +61,32 @@ export default function TeletextApp() {
   const [viewer,           setViewer]           = useState<TZKey>('LDN');  // default London
   const [focusedGroup,     setFocusedGroup]     = useState('Group A');
   const [selectedMatchNum, setSelectedMatchNum] = useState<number | null>(null);
+  const [selectedPreviewNum, setSelectedPreviewNum] = useState<number | null>(null);
   const [clockTick,        setClockTick]        = useState(0);
   const [typed,            setTyped]            = useState('');
   const [liveScores,       setLiveScores]       = useState<Map<number, LiveScore>>(new Map());
+  const [scorers,          setScorers]          = useState<TopScorer[]>([]);
   const [newsItems,        setNewsItems]        = useState<NewsItem[]>([]);
   const [lastUpdated,      setLastUpdated]      = useState<number | null>(null);
   const [isMobile,         setIsMobile]         = useState(() => window.innerWidth < 768);
   const stageRef = useRef<HTMLDivElement>(null);
 
-  // Load matches then immediately fetch live scores
+  // Load matches then immediately fetch live scores + real top scorers
   useEffect(() => {
     loadMatches().then(m => {
       setMatches(m);
       fetchLiveScores(m).then(scores => { setLiveScores(scores); setLastUpdated(Date.now()); });
+      fetchScorers(8).then(setScorers);
     });
   }, []);
 
-  // Poll live scores every 5 min
+  // Poll live scores + scorers every 5 min
   useEffect(() => {
     if (!matches) return;
-    const id = setInterval(() => fetchLiveScores(matches).then(scores => { setLiveScores(scores); setLastUpdated(Date.now()); }), 5 * 60 * 1000);
+    const id = setInterval(() => {
+      fetchLiveScores(matches).then(scores => { setLiveScores(scores); setLastUpdated(Date.now()); });
+      fetchScorers(8).then(setScorers);
+    }, 5 * 60 * 1000);
     return () => clearInterval(id);
   }, [matches]);
 
@@ -154,10 +168,12 @@ export default function TeletextApp() {
   const pageProps = {
     matches: matches ?? [],
     now, viewer,
-    liveScores, newsItems,
+    liveScores, newsItems, scorers,
     switchPage,
     focusedGroup, setFocusedGroup,
     selectedMatchNum, setSelectedMatchNum,
+    selectedPreviewNum, setSelectedPreviewNum,
+    isMobile,
   };
 
   return (
@@ -173,7 +189,7 @@ export default function TeletextApp() {
                   <div className="tt">
                     <StatusBar page={page} clockTick={clockTick} viewer={viewer} setViewer={setViewer} />
                     <Masthead page={page} />
-                    <SubHeader pageId={pageId} matches={matches} now={now} focusedGroup={focusedGroup} setFocusedGroup={setFocusedGroup} viewer={viewer} liveScores={liveScores} />
+                    <SubHeader pageId={pageId} matches={matches} now={now} focusedGroup={focusedGroup} setFocusedGroup={setFocusedGroup} viewer={viewer} liveScores={liveScores} selectedPreviewNum={selectedPreviewNum} setSelectedPreviewNum={setSelectedPreviewNum} />
 
                     {/* Page content */}
                     {pageId === 'news'     && <NewsPage     {...pageProps} />}
@@ -182,6 +198,7 @@ export default function TeletextApp() {
                     {pageId === 'groups'   && <GroupsPage   {...pageProps} />}
                     {pageId === 'groupdet' && <GroupDetailPage {...pageProps} />}
                     {pageId === 'review'   && <MatchReviewPage {...pageProps} />}
+                    {pageId === 'preview'  && <PreviewPage {...pageProps} />}
 
                     <FastextBar page={page} switchPage={switchPage} />
                   </div>
@@ -214,6 +231,7 @@ export default function TeletextApp() {
             liveScores={liveScores}
             lastUpdated={lastUpdated}
             newsItems={newsItems}
+            scorers={scorers}
           />
         </div>
       </div>
@@ -264,10 +282,12 @@ function Masthead({ page }: { page: PageConfig }) {
 const ALL_GROUPS_SUB = ['Group A','Group B','Group C','Group D','Group E','Group F',
                         'Group G','Group H','Group I','Group J','Group K','Group L'];
 
-function SubHeader({ pageId, matches, now, focusedGroup, setFocusedGroup, viewer, liveScores }: {
+function SubHeader({ pageId, matches, now, focusedGroup, setFocusedGroup, viewer, liveScores, selectedPreviewNum, setSelectedPreviewNum }: {
   pageId: PageId; matches: Match[]; now: number; focusedGroup: string;
   setFocusedGroup: (g: string) => void; viewer: TZKey;
   liveScores: Map<number, LiveScore>;
+  selectedPreviewNum: number | null;
+  setSelectedPreviewNum: (n: number) => void;
 }) {
   const t = TZ[viewer]?.code ?? '';
   let node: React.ReactNode = null;
@@ -291,6 +311,20 @@ function SubHeader({ pageId, matches, now, focusedGroup, setFocusedGroup, viewer
     );
   }
   if (pageId === 'review')   node = <><span className="em">— MOST RECENT RESULTS —</span> PICK BELOW TO DRILL IN</>;
+  if (pageId === 'preview') {
+    const upcoming = matches.filter(m => m.kickoffUTC > now).sort((a, b) => a.kickoffUTC - b.kickoffUTC);
+    const idx = Math.max(0, upcoming.findIndex(m => m.num === selectedPreviewNum));
+    const cur = upcoming[idx];
+    const prev = () => { if (upcoming.length) setSelectedPreviewNum(upcoming[(idx - 1 + upcoming.length) % upcoming.length]!.num); };
+    const next = () => { if (upcoming.length) setSelectedPreviewNum(upcoming[(idx + 1) % upcoming.length]!.num); };
+    node = (
+      <span className="tt__sub__nav">
+        <button className="tt__sub__navbtn" onClick={prev}>◄</button>
+        <span>{cur ? `${cur.teams[0].short} v ${cur.teams[1].short}` : 'PREVIEW'} <span className="em">· MATCH PREVIEW</span></span>
+        <button className="tt__sub__navbtn" onClick={next}>►</button>
+      </span>
+    );
+  }
   return <div className="tt__sub">{node}</div>;
 }
 
@@ -327,7 +361,7 @@ function TrophyMosaic() {
 }
 
 // ─── Remote control ────────────────────────────────────────────────────────
-function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setViewer, matches, now, liveScores, lastUpdated, newsItems }: {
+function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setViewer, matches, now, liveScores, lastUpdated, newsItems, scorers }: {
   page: PageConfig;
   typed: string;
   typeDigit: (d: string) => void;
@@ -340,6 +374,7 @@ function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setVie
   liveScores: Map<number, LiveScore>;
   lastUpdated: number | null;
   newsItems: NewsItem[];
+  scorers: TopScorer[];
 }) {
   return (
     <div className="rmt">
@@ -405,7 +440,7 @@ function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setVie
 
       {/* Brand foot — live ticker */}
       <div className="rmt__foot">
-        <LiveTicker matches={matches} now={now} liveScores={liveScores} lastUpdated={lastUpdated} newsItems={newsItems} />
+        <LiveTicker matches={matches} now={now} liveScores={liveScores} lastUpdated={lastUpdated} newsItems={newsItems} scorers={scorers} />
         <span className="rmt__pwr"></span>
       </div>
     </div>
@@ -413,12 +448,13 @@ function Remote({ page, typed, typeDigit, clearTyped, switchPage, viewer, setVie
 }
 
 // ─── Live ticker (rotates every 4 s in the remote footer) ─────────────────
-function LiveTicker({ matches, now, liveScores, lastUpdated, newsItems }: {
+function LiveTicker({ matches, now, liveScores, lastUpdated, newsItems, scorers }: {
   matches: Match[];
   now: number;
   liveScores: Map<number, LiveScore>;
   lastUpdated: number | null;
   newsItems: NewsItem[];
+  scorers: TopScorer[];
 }) {
   const [tick, setTick] = useState(0);
 
@@ -447,8 +483,7 @@ function LiveTicker({ matches, now, liveScores, lastUpdated, newsItems }: {
     }
   }
 
-  // State 1 — top scorer or next fixture
-  const scorers = topScorers(matches, now, 1, liveScores);
+  // State 1 — top scorer (real, from football-data.org) or next fixture
   if (scorers.length > 0 && scorers[0]!.goals > 0) {
     const s = scorers[0]!;
     const surname = s.name.split(' ').pop() ?? s.name;

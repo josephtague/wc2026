@@ -2,51 +2,38 @@
 // Score data is real-only: resolveScore returns null when no confirmed result is available.
 // All network functions return empty data gracefully on failure — no fake fallback.
 
-import type { Match, LiveScore, MatchStatus, NewsItem } from './types';
+import type { Match, LiveScore, MatchStatus, NewsItem, TopScorer } from './types';
 
 // ── Config ─────────────────────────────────────────────────────────────────
-// In dev: requests go via Vite proxy (/api/fd) — key added server-side, never in browser.
-// In prod: direct football-data.org request — needs a serverless proxy for full security
-//          (or set VITE_FD_KEY as an acceptable short-term alternative).
+// All live data is fetched through same-origin /api/* endpoints so API keys stay
+// server-side. In dev these are handled by the Vite proxy (vite.config.ts); in
+// prod by the Vercel serverless functions in /api. No key ever reaches the browser.
 const WC_COMP = 'WC';   // football-data.org competition code for FIFA World Cup
 const WC_YEAR = '2026';
 
-const FD_SCORES_URL = import.meta.env.DEV
-  ? `/api/fd/competitions/${WC_COMP}/matches?season=${WC_YEAR}`
-  : (() => {
-      const key = (import.meta.env.VITE_FD_KEY as string | undefined) ?? '';
-      return key
-        ? `https://api.football-data.org/v4/competitions/${WC_COMP}/matches?season=${WC_YEAR}`
-        : null;  // no key in prod → graceful fallback to fake data
-    })();
-
-// Retain FD_KEY for non-dev direct requests
-const FD_KEY = import.meta.env.DEV ? '' : ((import.meta.env.VITE_FD_KEY as string | undefined) ?? '');
-
-// BBC Sport RSS endpoint
-const BBC_FEED = 'https://feeds.bbci.co.uk/sport/football/rss.xml';
-// Dev: use Vite server proxy (vite.config.ts routes /api/rss → BBC endpoint, no CORS issue).
-// Prod: codetabs.com free CORS proxy — returns raw XML directly, no auth needed.
-const RSS_URL = import.meta.env.DEV
-  ? '/api/rss'
-  : `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(BBC_FEED)}`;
+const FD_BASE          = `/api/fd/competitions/${WC_COMP}`;
+const FD_SCORES_URL    = `${FD_BASE}/matches?season=${WC_YEAR}`;
+const FD_SCORERS_URL   = `${FD_BASE}/scorers`;
+const FD_STANDINGS_URL = `${FD_BASE}/standings`;
+const RSS_URL          = '/api/rss';
 
 // ── In-memory TTL cache ────────────────────────────────────────────────────
 interface CacheEntry<T> { data: T; ts: number }
 const _cache = new Map<string, CacheEntry<unknown>>();
 
-function getCached<T>(key: string, ttlMs: number): T | null {
+export function getCached<T>(key: string, ttlMs: number): T | null {
   const e = _cache.get(key) as CacheEntry<T> | undefined;
   if (!e || Date.now() - e.ts > ttlMs) { _cache.delete(key); return null; }
   return e.data;
 }
-function setCached<T>(key: string, data: T): void {
+export function setCached<T>(key: string, data: T): void {
   _cache.set(key, { data, ts: Date.now() });
 }
 
 // ── football-data.org types ────────────────────────────────────────────────
 interface FDScore { fullTime: { home: number | null; away: number | null } }
 interface FDMatch {
+  id:       number;     // football-data.org match id — needed to cross-link providers
   utcDate:  string;
   status:   string;
   minute?:  number;
@@ -55,6 +42,11 @@ interface FDMatch {
   awayTeam: { tla: string };
 }
 interface FDResponse { matches: FDMatch[] }
+
+// internal match num (1–104) → football-data.org match id, built during buildScoreMap
+const _fdIdByNum = new Map<number, number>();
+/** football-data.org match id for our internal match number, if known. */
+export function fdIdForMatch(num: number): number | undefined { return _fdIdByNum.get(num); }
 
 /**
  * Map football-data.org matches → our internal match numbers (1–104).
@@ -66,6 +58,7 @@ function buildScoreMap(fdMatches: FDMatch[], localMatches: Match[]): Map<number,
     const fdMs   = new Date(fd.utcDate).getTime();
     const local  = localMatches.find(m => Math.abs(m.kickoffUTC - fdMs) < 2 * 60 * 1000);
     if (!local) continue;
+    _fdIdByNum.set(local.num, fd.id);
     out.set(local.num, {
       home:   fd.score.fullTime.home ?? 0,
       away:   fd.score.fullTime.away ?? 0,
@@ -77,9 +70,8 @@ function buildScoreMap(fdMatches: FDMatch[], localMatches: Match[]): Map<number,
 }
 
 /**
- * Fetch live/final scores for WC2026 from football-data.org.
- * Requires VITE_FD_KEY env var (free tier: 10 req/min).
- * Returns empty Map when key is absent or request fails — app falls back to fake data.
+ * Fetch live/final scores for WC2026 via the same-origin /api/fd proxy
+ * (key injected server-side). Returns an empty Map on failure — never fake data.
  * Results are cached for 5 minutes.
  */
 export async function fetchLiveScores(localMatches: Match[]): Promise<Map<number, LiveScore>> {
@@ -87,16 +79,8 @@ export async function fetchLiveScores(localMatches: Match[]): Promise<Map<number
   const cached = getCached<Map<number, LiveScore>>('scores', SCORE_TTL);
   if (cached) return cached;
 
-  if (!FD_SCORES_URL) {
-    console.info('[liveData] No FD key configured — live scores disabled, using demo data');
-    return new Map();
-  }
-
   try {
-    // In dev: key is injected by Vite proxy, no header needed here
-    // In prod: attach key directly (until a serverless proxy is in place)
-    const headers: HeadersInit = FD_KEY ? { 'X-Auth-Token': FD_KEY } : {};
-    const res = await fetch(FD_SCORES_URL, { headers });
+    const res = await fetch(FD_SCORES_URL);
     if (!res.ok) throw new Error(`football-data.org ${res.status}: ${res.statusText}`);
     const json  = await res.json() as FDResponse;
     const map   = buildScoreMap(json.matches, localMatches);
@@ -106,6 +90,74 @@ export async function fetchLiveScores(localMatches: Match[]): Promise<Map<number
   } catch (err) {
     console.warn('[liveData] fetchLiveScores failed:', err);
     return new Map();
+  }
+}
+
+// ── football-data.org top scorers (real Golden Boot) ─────────────────────────
+interface FDScorer {
+  player: { name: string };
+  team:   { tla?: string; shortName?: string; name: string };
+  goals:  number | null;
+}
+interface FDScorersResponse { scorers: FDScorer[] }
+
+/**
+ * Fetch the real tournament top scorers from football-data.org.
+ * Returns [] when unavailable (pre-tournament, no goals yet, or request failure).
+ * Cached for 15 minutes.
+ */
+export async function fetchScorers(limit = 8): Promise<TopScorer[]> {
+  const TTL = 15 * 60 * 1000;
+  const cached = getCached<TopScorer[]>('scorers', TTL);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(FD_SCORERS_URL);
+    if (!res.ok) throw new Error(`scorers ${res.status}`);
+    const json = await res.json() as FDScorersResponse;
+    const out: TopScorer[] = (json.scorers ?? [])
+      .map(s => ({ name: s.player.name, team: s.team.tla ?? s.team.shortName ?? s.team.name, goals: s.goals ?? 0 }))
+      .slice(0, limit);
+    setCached('scorers', out);
+    return out;
+  } catch (err) {
+    console.warn('[liveData] fetchScorers failed:', err);
+    return [];
+  }
+}
+
+// ── football-data.org standings (real group tables) ──────────────────────────
+export interface FDStandingRow {
+  position: number;
+  team: { tla?: string; name: string };
+  playedGames: number; won: number; draw: number; lost: number;
+  points: number; goalsFor: number; goalsAgainst: number; goalDifference: number;
+}
+interface FDStandingsResponse { standings: { group: string | null; table: FDStandingRow[] }[] }
+
+/**
+ * Fetch official group standings from football-data.org, keyed by group name
+ * (e.g. "GROUP A"). Returns null when unavailable. Cached for 15 minutes.
+ * Not yet wired into the UI — reserved for qualification scenarios.
+ */
+export async function fetchStandings(): Promise<Record<string, FDStandingRow[]> | null> {
+  const TTL = 15 * 60 * 1000;
+  const cached = getCached<Record<string, FDStandingRow[]>>('standings', TTL);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(FD_STANDINGS_URL);
+    if (!res.ok) throw new Error(`standings ${res.status}`);
+    const json = await res.json() as FDStandingsResponse;
+    const out: Record<string, FDStandingRow[]> = {};
+    for (const s of json.standings ?? []) {
+      if (s.group) out[s.group.toUpperCase()] = s.table;
+    }
+    setCached('standings', out);
+    return out;
+  } catch (err) {
+    console.warn('[liveData] fetchStandings failed:', err);
+    return null;
   }
 }
 
@@ -124,9 +176,9 @@ function parseRSS(xml: string): NewsItem[] {
 }
 
 /**
- * Fetch latest BBC Sport football headlines.
- * Dev: via Vite server proxy (/api/rss). Prod: via codetabs.com CORS proxy.
- * Both return raw RSS XML. Results cached for 15 min. Returns [] on failure.
+ * Fetch latest BBC Sport football headlines via the same-origin /api/rss proxy
+ * (Vite dev proxy / Vercel edge function). Returns raw RSS XML, parsed to items.
+ * Cached for 15 min. Returns [] on failure.
  */
 export async function fetchNewsHeadlines(): Promise<NewsItem[]> {
   const NEWS_TTL = 15 * 60 * 1000;

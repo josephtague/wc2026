@@ -1,6 +1,6 @@
 // types.ts — shared TypeScript interfaces for the WC2026 Teletext app
 
-export type TZKey = 'PT' | 'CDM' | 'ET' | 'BRT' | 'ART' | 'LDN' | 'PAR' | 'DXB' | 'SHA' | 'TYO' | 'SYD';
+export type TZKey = 'PT' | 'CDM' | 'ET' | 'BRT' | 'LDN' | 'PAR' | 'DXB' | 'SHA' | 'TYO' | 'SYD';
 
 export interface TZInfo {
   key: TZKey;
@@ -80,13 +80,14 @@ export interface ScorerEntry {
 export interface FullResult {
   score: FakeResult;
   scorers: { home: ScorerEntry[]; away: ScorerEntry[] };
+  // null when the data source doesn't expose match detail (free tier) — UI shows "—".
   stats: {
     possession: [number, number];
     shots: [number, number];
     corners: [number, number];
     yellow: [number, number];
-  };
-  attendance: number;
+  } | null;
+  attendance: number | null;
 }
 
 export interface StandingRow {
@@ -124,7 +125,7 @@ export interface Headline {
   link?: string;       // external URL (BBC Sport articles only)
 }
 
-export type PageId = 'news' | 'fixtures' | 'results' | 'groups' | 'groupdet' | 'review';
+export type PageId = 'news' | 'fixtures' | 'results' | 'groups' | 'groupdet' | 'review' | 'preview';
 
 // ── Live data ──────────────────────────────────────────────────────────────
 // football-data.org status values (plus a few extras for safety)
