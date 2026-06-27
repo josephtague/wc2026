@@ -46,7 +46,9 @@ interface EspnCompetitor { homeAway?: string; team?: { displayName?: string } }
 interface EspnEvent { id: string; competitions?: { competitors?: EspnCompetitor[] }[] }
 interface EspnScoreboard { events?: EspnEvent[] }
 
-const ESPN = '/api/espn/apis/site/v2/sports/soccer/fifa.world';
+// Same-origin on web; absolute prod URL in the Capacitor native build (see liveData.ts).
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
+const ESPN = `${API_BASE}/api/espn/apis/site/v2/sports/soccer/fifa.world`;
 
 function yyyymmdd(ms: number): string {
   const d = new Date(ms);

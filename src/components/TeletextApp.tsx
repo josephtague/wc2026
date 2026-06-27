@@ -9,6 +9,7 @@ import {
 } from './TeletextViews';
 import { PreviewPage } from './PreviewPage';
 import { groupStandings } from '../lib/teletextData';
+import { scheduleKickoffReminders } from '../lib/notifications';
 
 // ── Page registry ──────────────────────────────────────────────────────────
 const NAV: PageConfig['fastext'] = [
@@ -77,6 +78,7 @@ export default function TeletextApp() {
       setMatches(m);
       fetchLiveScores(m).then(scores => { setLiveScores(scores); setLastUpdated(Date.now()); });
       fetchScorers(8).then(setScorers);
+      scheduleKickoffReminders(m, Date.now());   // native only — no-op on web
     });
   }, []);
 

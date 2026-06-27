@@ -5,17 +5,19 @@
 import type { Match, LiveScore, MatchStatus, NewsItem, TopScorer } from './types';
 
 // ── Config ─────────────────────────────────────────────────────────────────
-// All live data is fetched through same-origin /api/* endpoints so API keys stay
-// server-side. In dev these are handled by the Vite proxy (vite.config.ts); in
-// prod by the Vercel serverless functions in /api. No key ever reaches the browser.
+// All live data is fetched through the /api/* proxy so API keys stay server-side.
+// On the web this is same-origin (Vite proxy in dev, Vercel functions in prod).
+// In the Capacitor native build the WebView origin is localhost, so VITE_API_BASE
+// points /api at the deployed prod URL (empty everywhere else → unchanged web).
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
 const WC_COMP = 'WC';   // football-data.org competition code for FIFA World Cup
 const WC_YEAR = '2026';
 
-const FD_BASE          = `/api/fd/competitions/${WC_COMP}`;
+const FD_BASE          = `${API_BASE}/api/fd/competitions/${WC_COMP}`;
 const FD_SCORES_URL    = `${FD_BASE}/matches?season=${WC_YEAR}`;
 const FD_SCORERS_URL   = `${FD_BASE}/scorers`;
 const FD_STANDINGS_URL = `${FD_BASE}/standings`;
-const RSS_URL          = '/api/rss';
+const RSS_URL          = `${API_BASE}/api/rss`;
 
 // ── In-memory TTL cache ────────────────────────────────────────────────────
 interface CacheEntry<T> { data: T; ts: number }

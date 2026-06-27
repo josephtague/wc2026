@@ -32,6 +32,7 @@ export function NewsPage({ matches, now, viewer, liveScores, newsItems, scorers,
   const hl = useMemo(() => headlines(matches, now, liveScores, newsItems, scorers), [matches, now, liveScores, newsItems, scorers]);
   const nextMatch = useMemo(() => matches.find(m => m.kickoffUTC > now), [matches, now]);
   const [drawerItem, setDrawerItem] = useState<Headline | null>(null);
+  const [scorersOpen, setScorersOpen] = useState(false);
 
   const trim = (s: string, n: number) => s.length <= n ? s : s.slice(0, n - 1).replace(/\s\S*$/, '') + '…';
 
@@ -89,7 +90,7 @@ export function NewsPage({ matches, now, viewer, liveScores, newsItems, scorers,
           <div className="news__scorers">
             <div className="news__kick c-y">► GOLDEN BOOT RACE</div>
             {scorers.length === 0 && <div className="c-dim">No goals yet.</div>}
-            {scorers.map((s, i) => (
+            {(scorersOpen ? scorers : scorers.slice(0, 2)).map((s, i) => (
               <div key={i} className="news__scorerrow">
                 <span className="c-w">{String(i + 1).padStart(2, '0')}.</span>
                 <span className="c-y">{s.name}</span>
@@ -97,6 +98,11 @@ export function NewsPage({ matches, now, viewer, liveScores, newsItems, scorers,
                 <span className="c-w" style={{ textAlign: 'right' }}>{s.goals}</span>
               </div>
             ))}
+            {scorers.length > 2 && (
+              <button className="news__scorers__more c-g" onClick={() => setScorersOpen(o => !o)}>
+                {scorersOpen ? '▾ SHOW LESS' : `▸ SHOW ALL (${scorers.length})`}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -142,25 +148,25 @@ function Countdown({ to, now }: { to: number; now: number }) {
 // ─────────────────────────────────────────────────────────────────────
 // P140  UPCOMING FIXTURES
 // ─────────────────────────────────────────────────────────────────────
-export function FixturesPage({ matches, now, viewer, liveScores, switchPage, setSelectedPreviewNum, isMobile }: BaseProps) {
+export function FixturesPage({ matches, now, viewer, liveScores, switchPage, setSelectedPreviewNum, setSelectedMatchNum, isMobile }: BaseProps) {
   const upcoming = useMemo(
     () => matches.filter(m => !isMatchFinished(m.num, m.kickoffUTC, now, liveScores)),
     [matches, now, liveScores],
   );
   return <FixturesOrResults rows={upcoming} viewer={viewer} liveScores={liveScores} showResults={false} now={now}
-    switchPage={switchPage} setSelectedPreviewNum={setSelectedPreviewNum} isMobile={isMobile} />;
+    switchPage={switchPage} setSelectedPreviewNum={setSelectedPreviewNum} setSelectedMatchNum={setSelectedMatchNum} isMobile={isMobile} />;
 }
 
 // ─────────────────────────────────────────────────────────────────────
 // P141  RESULTS
 // ─────────────────────────────────────────────────────────────────────
-export function ResultsPage({ matches, now, viewer, liveScores, switchPage, setSelectedPreviewNum, isMobile }: BaseProps) {
+export function ResultsPage({ matches, now, viewer, liveScores, switchPage, setSelectedPreviewNum, setSelectedMatchNum, isMobile }: BaseProps) {
   const played = useMemo(
     () => matches.filter(m => isMatchFinished(m.num, m.kickoffUTC, now, liveScores)).slice().reverse(),
     [matches, now, liveScores],
   );
   return <FixturesOrResults rows={played} viewer={viewer} liveScores={liveScores} showResults now={now}
-    switchPage={switchPage} setSelectedPreviewNum={setSelectedPreviewNum} isMobile={isMobile} />;
+    switchPage={switchPage} setSelectedPreviewNum={setSelectedPreviewNum} setSelectedMatchNum={setSelectedMatchNum} isMobile={isMobile} />;
 }
 
 // Shared list renderer
@@ -172,9 +178,10 @@ interface FORProps {
   now: number;
   switchPage: (id: PageId) => void;
   setSelectedPreviewNum: (n: number) => void;
+  setSelectedMatchNum: (n: number) => void;
   isMobile: boolean;
 }
-function FixturesOrResults({ rows, viewer, liveScores, showResults, now, switchPage, setSelectedPreviewNum, isMobile }: FORProps) {
+function FixturesOrResults({ rows, viewer, liveScores, showResults, now, switchPage, setSelectedPreviewNum, setSelectedMatchNum, isMobile }: FORProps) {
   const days = useMemo(() => {
     const map = new Map<string, { key: string; label: string; matches: Match[] }>();
     rows.forEach(m => {
@@ -213,6 +220,11 @@ function FixturesOrResults({ rows, viewer, liveScores, showResults, now, switchP
           <button className="fix__card__preview c-g"
             onClick={() => { setSelectedPreviewNum(m.num); switchPage('preview'); }}
             title="Match preview">{isMobile ? '►' : '► PREVIEW'}</button>
+        )}
+        {finished && (
+          <button className="fix__card__report c-c"
+            onClick={() => { setSelectedMatchNum(m.num); switchPage('review'); }}
+            title="Match report">{isMobile ? '►' : '► REPORT'}</button>
         )}
       </div>
     );

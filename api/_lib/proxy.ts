@@ -1,11 +1,17 @@
 // Shared helpers for the serverless edge proxies.
 // Files prefixed with _ are not routed by Vercel — import-only modules.
 
+// These proxies are public, read-only passthroughs, so an open CORS policy is
+// safe — and it's required so the Capacitor native build (WebView origin
+// `localhost`/`capacitor://`) can call the deployed /api endpoints cross-origin.
+// Our requests are simple GETs (no custom headers) → no preflight needed.
+const CORS = { 'access-control-allow-origin': '*' };
+
 /** JSON error response with no caching. */
 export function errorJson(message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...CORS },
   });
 }
 
@@ -29,6 +35,7 @@ export async function proxyGet(
       headers: {
         'content-type': upstream.headers.get('content-type') ?? 'application/json',
         'cache-control': `public, s-maxage=${sMaxAgeSeconds}, stale-while-revalidate=${sMaxAgeSeconds * 4}`,
+        ...CORS,
       },
     });
   } catch {
