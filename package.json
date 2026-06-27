@@ -6,14 +6,23 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:app": "npm run build && cap sync",
     "preview": "vite preview",
     "convert": "python3 scripts/convert-schedule.py"
   },
   "dependencies": {
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/local-notifications": "^8.2.0",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
     "@types/node": "^25.9.1",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",

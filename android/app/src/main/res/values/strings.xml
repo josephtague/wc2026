@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">WC26 Ceefax</string>
+    <string name="title_activity_main">WC26 Ceefax</string>
+    <string name="package_name">app.wc2026.ceefax</string>
+    <string name="custom_url_scheme">app.wc2026.ceefax</string>
+</resources>

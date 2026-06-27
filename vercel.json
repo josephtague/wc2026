@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/api/fd/:path*", "destination": "/api/fd?upstream=:path*" },
+    { "source": "/api/espn/:path*", "destination": "/api/espn?upstream=:path*" },
+    { "source": "/api/af/:path*", "destination": "/api/af?upstream=:path*" }
+  ]
+}

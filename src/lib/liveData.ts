@@ -5,17 +5,19 @@
 import type { Match, LiveScore, MatchStatus, NewsItem, TopScorer } from './types';
 
 // ── Config ─────────────────────────────────────────────────────────────────
-// All live data is fetched through same-origin /api/* endpoints so API keys stay
-// server-side. In dev these are handled by the Vite proxy (vite.config.ts); in
-// prod by the Vercel serverless functions in /api. No key ever reaches the browser.
+// All live data is fetched through the /api/* proxy so API keys stay server-side.
+// On the web this is same-origin (Vite proxy in dev, Vercel functions in prod).
+// In the Capacitor native build the WebView origin is localhost, so VITE_API_BASE
+// points /api at the deployed prod URL (empty everywhere else → unchanged web).
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
 const WC_COMP = 'WC';   // football-data.org competition code for FIFA World Cup
 const WC_YEAR = '2026';
 
-const FD_BASE          = `/api/fd/competitions/${WC_COMP}`;
+const FD_BASE          = `${API_BASE}/api/fd/competitions/${WC_COMP}`;
 const FD_SCORES_URL    = `${FD_BASE}/matches?season=${WC_YEAR}`;
 const FD_SCORERS_URL   = `${FD_BASE}/scorers`;
 const FD_STANDINGS_URL = `${FD_BASE}/standings`;
-const RSS_URL          = '/api/rss';
+const RSS_URL          = `${API_BASE}/api/rss`;
 
 // ── In-memory TTL cache ────────────────────────────────────────────────────
 interface CacheEntry<T> { data: T; ts: number }
@@ -48,20 +50,40 @@ const _fdIdByNum = new Map<number, number>();
 /** football-data.org match id for our internal match number, if known. */
 export function fdIdForMatch(num: number): number | undefined { return _fdIdByNum.get(num); }
 
+// football-data.org uses KSA for Saudi Arabia; our schedule uses SAU. Otherwise the
+// 3-letter codes align between the two sources.
+function normTla(code: string): string { return code === 'KSA' ? 'SAU' : code; }
+
 /**
  * Map football-data.org matches → our internal match numbers (1–104).
- * We match on kick-off UTC time (within 2 min) since both sources derive from the same schedule.
+ *
+ * Matches are paired on the TWO TEAMS (not kick-off time): several WC matches kick
+ * off simultaneously, so a time-only match would attach a score to the wrong fixture
+ * (e.g. SEN 5-0 IRQ landing on NOR v FRA at the same slot). A generous time window is
+ * used only to disambiguate a rare repeat meeting (group vs a later knockout), and the
+ * home/away orientation is preserved so the score is never inverted.
  */
 function buildScoreMap(fdMatches: FDMatch[], localMatches: Match[]): Map<number, LiveScore> {
   const out = new Map<number, LiveScore>();
   for (const fd of fdMatches) {
     const fdMs   = new Date(fd.utcDate).getTime();
-    const local  = localMatches.find(m => Math.abs(m.kickoffUTC - fdMs) < 2 * 60 * 1000);
+    const fdHome = normTla(fd.homeTeam.tla ?? '');
+    const fdAway = normTla(fd.awayTeam.tla ?? '');
+    if (!fdHome || !fdAway) continue;   // unscheduled knockout placeholder (no teams yet)
+
+    let local: Match | undefined, swapped = false;
+    for (const m of localMatches) {
+      if (Math.abs(m.kickoffUTC - fdMs) > 6 * 60 * 60 * 1000) continue;   // not the same fixture
+      if (m.teams[0].short === fdHome && m.teams[1].short === fdAway) { local = m; swapped = false; break; }
+      if (m.teams[0].short === fdAway && m.teams[1].short === fdHome) { local = m; swapped = true;  break; }
+    }
     if (!local) continue;
+
     _fdIdByNum.set(local.num, fd.id);
+    const h = fd.score.fullTime.home ?? 0, a = fd.score.fullTime.away ?? 0;
     out.set(local.num, {
-      home:   fd.score.fullTime.home ?? 0,
-      away:   fd.score.fullTime.away ?? 0,
+      home:   swapped ? a : h,   // re-orient to OUR home/away if the providers list them swapped
+      away:   swapped ? h : a,
       status: fd.status as MatchStatus,
       minute: fd.minute,
     });
