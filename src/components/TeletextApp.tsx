@@ -9,6 +9,7 @@ import {
 } from './TeletextViews';
 import { PreviewPage } from './PreviewPage';
 import { BracketPage } from './BracketPage';
+import { TodayPage } from './TodayPage';
 import { groupStandings } from '../lib/teletextData';
 import { scheduleKickoffReminders } from '../lib/notifications';
 
@@ -22,6 +23,7 @@ const NAV: PageConfig['fastext'] = [
 const PAGES: Record<string, PageConfig> = {
   '100': { id: 'news',     no: '100', title: 'NEWS',     titleColor: 'is-yellow', subRight: 'WORLD CUP 2026', fastext: NAV },
   '140': { id: 'fixtures', no: '140', title: 'FIXTURES', titleColor: 'is-yellow', subRight: 'WORLD CUP 2026', fastext: NAV },
+  '142': { id: 'today',    no: '142', title: 'TODAY',    titleColor: 'is-green',  subRight: 'WORLD CUP 2026', fastext: NAV },
   '141': { id: 'results',  no: '141', title: 'RESULTS',  titleColor: '',          subRight: 'WORLD CUP 2026',
     fastext: [
       { c: 'r', label: 'NEWS',         to: 'news'     },
@@ -59,7 +61,7 @@ const PAGES: Record<string, PageConfig> = {
       { c: 'c', label: 'GROUPS',   to: 'groups'   },
     ] },
 };
-const ID_TO_NO: Record<PageId, string> = { news:'100',fixtures:'140',results:'141',groups:'150',groupdet:'151',review:'160',preview:'161',bracket:'170' };
+const ID_TO_NO: Record<PageId, string> = { news:'100',fixtures:'140',today:'142',results:'141',groups:'150',groupdet:'151',review:'160',preview:'161',bracket:'170' };
 
 // ── Main App ───────────────────────────────────────────────────────────────
 export default function TeletextApp() {
@@ -90,15 +92,16 @@ export default function TeletextApp() {
     });
   }, []);
 
-  // Poll live scores + scorers every 5 min
+  // Poll live scores + scorers. Refresh fast (60s) while any match is live, else every 5 min.
+  const anyLive = !!matches && matches.some(m => isMatchLive(m.num, m.kickoffUTC, now, liveScores));
   useEffect(() => {
     if (!matches) return;
     const id = setInterval(() => {
       fetchLiveScores(matches).then(scores => { setLiveScores(scores); setLastUpdated(Date.now()); });
       fetchScorers(8).then(setScorers);
-    }, 5 * 60 * 1000);
+    }, anyLive ? 60 * 1000 : 5 * 60 * 1000);
     return () => clearInterval(id);
-  }, [matches]);
+  }, [matches, anyLive]);
 
   // Fetch + poll news headlines every 15 min
   useEffect(() => {
@@ -204,6 +207,7 @@ export default function TeletextApp() {
                     {/* Page content */}
                     {pageId === 'news'     && <NewsPage     {...pageProps} />}
                     {pageId === 'fixtures' && <FixturesPage {...pageProps} />}
+                    {pageId === 'today'    && <TodayPage matches={pageProps.matches} now={now} viewer={viewer} liveScores={liveScores} />}
                     {pageId === 'results'  && <ResultsPage  {...pageProps} />}
                     {pageId === 'groups'   && <GroupsPage   {...pageProps} />}
                     {pageId === 'groupdet' && <GroupDetailPage {...pageProps} />}
@@ -303,7 +307,13 @@ function SubHeader({ pageId, matches, now, focusedGroup, setFocusedGroup, viewer
   const t = TZ[viewer]?.code ?? '';
   let node: React.ReactNode = null;
   if (pageId === 'news')     node = <><span className="em">— DAILY HEADLINES —</span> ALL TIMES IN {t}</>;
-  if (pageId === 'fixtures') node = <><span className="em">— UPCOMING —</span> KICK-OFF TIMES SHOWN IN {t}</>;
+  if (pageId === 'fixtures') node = <><span className="em">— UPCOMING —</span> TIMES IN {t} <span className="em">·</span> <span className="c-g">P142 TODAY/LIVE</span></>;
+  if (pageId === 'today') {
+    const liveN = matches.filter(m => isMatchLive(m.num, m.kickoffUTC, now, liveScores)).length;
+    node = liveN > 0
+      ? <><span className="c-r">● {liveN} LIVE NOW</span> <span className="em">·</span> TIMES IN {t}</>
+      : <><span className="em">— TODAY —</span> MATCHES & LIVE SCORES <span className="em">·</span> {t}</>;
+  }
   if (pageId === 'results')  node = <><span className="em">— FINAL SCORES —</span> MOST RECENT FIRST</>;
   if (pageId === 'groups') {
     const count = Object.keys(groupStandings(matches, now, liveScores)).length;

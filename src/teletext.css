@@ -374,6 +374,7 @@ html, body, #root {
 }
 .tt__title.is-yellow { color: var(--tt-yellow); }
 .tt__title.is-white  { color: var(--tt-white); }
+.tt__title.is-green  { color: var(--tt-green); }
 .tt__head-right { font-family: var(--font-tt); font-size: 24px; line-height: 1.05; color: var(--tt-red); text-align: right; letter-spacing: 0.04em; }
 .tt__head-right .pageno { color: var(--tt-magenta); font-family: var(--font-tt); font-size: 28px; display: block; margin-top: 4px; }
 
@@ -555,6 +556,12 @@ html, body, #root {
 .gd__stand__row.qual { color: var(--tt-yellow); }
 .gd__stand__row.elim { color: var(--tt-dim); }
 .gd__stand__row .pts { color: var(--tt-yellow); font-weight: 700; text-align: right; }
+.gd__qual { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 8px 0 4px; font-size: 18px; }
+.gd__qual__lbl { letter-spacing: 0.05em; }
+.gd__qual__note { padding: 1px 8px; border: 1px solid currentColor; letter-spacing: 0.04em; }
+.gd__qual__note--qual { color: var(--tt-green); }
+.gd__qual__note--elim { color: var(--tt-dim); }
+.gd__qual__note--info { color: var(--tt-cyan); }
 .gd__fix { font-size: 20px; line-height: 1.2; overflow: hidden; }
 .gd__fix__row { display: grid; grid-template-columns: 90px 70px 1fr 70px 1fr 140px; gap: 8px; align-items: baseline; padding: 2px 4px; border-bottom: 1px dashed rgba(43,242,255,0.15); }
 .gd__fix__row:hover { background: rgba(43,242,255,0.06); }

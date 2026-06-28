@@ -3,7 +3,7 @@
 
 import { resolveScore, isMatchFinished, isMatchLive } from './liveData';
 import type {
-  Match, StandingRow, GroupResult,
+  Match, StandingRow, GroupResult, QualNote,
   TopScorer, Headline, FullResult, LiveScore, NewsItem,
 } from './types';
 
@@ -95,6 +95,50 @@ export function groupResults(
       const live     = isMatchLive(m.num, m.kickoffUTC, nowMs, liveScores);
       return { m, finished, live, score: resolveScore(m.num, liveScores) };
     });
+}
+
+// ── Qualification scenarios (top-2) ────────────────────────────────────────
+// v1: conservative, mathematically-safe top-2 notes — only claims a team is
+// THROUGH or OUT when it is guaranteed regardless of remaining results. The
+// granular "needs a win/draw vs Z" per-fixture maths (and best-3rd seeding
+// across groups) is deferred to v2.
+const GROUP_TEAM_GAMES = 3;   // each team plays 3 group matches
+
+export function qualificationNotes(
+  matches: Match[],
+  groupName: string,
+  nowMs: number,
+  liveScores: Map<number, LiveScore> = new Map(),
+): QualNote[] {
+  const rows = groupStandings(matches, nowMs, liveScores)[groupName];
+  if (!rows || rows.length === 0) return [];
+  const playedTotal = rows.reduce((a, r) => a + r.p, 0) / 2;
+  const totalGames  = (rows.length * GROUP_TEAM_GAMES) / 2;   // 4 teams → 6
+
+  if (playedTotal >= totalGames) {
+    return [
+      { text: 'GROUP DECIDED', tone: 'info' },
+      { text: `${rows[0]!.short} & ${rows[1]!.short} ADVANCE`, tone: 'qual' },
+    ];
+  }
+
+  const maxPts = (r: StandingRow) => r.pts + 3 * (GROUP_TEAM_GAMES - r.p);
+  const notes: QualNote[] = [];
+
+  for (const r of rows) {
+    // Clinched top-2: at most one other team can even draw level on points (a
+    // level team could overtake on GD, so a tie still counts against the clinch).
+    const canReach = rows.filter(o => o !== r && maxPts(o) >= r.pts).length;
+    if (canReach <= 1) { notes.push({ text: `${r.short} THROUGH`, tone: 'qual' }); continue; }
+    // Eliminated: at least two teams already sit above this team's best possible finish.
+    const above = rows.filter(o => o !== r && o.pts > maxPts(r)).length;
+    if (above >= 2) notes.push({ text: `${r.short} OUT`, tone: 'elim' });
+  }
+
+  if (notes.length === 0) {
+    notes.push({ text: `ALL TO PLAY FOR · ${totalGames - playedTotal} TO COME`, tone: 'info' });
+  }
+  return notes;
 }
 
 // ── News headlines ─────────────────────────────────────────────────────────

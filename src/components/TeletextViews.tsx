@@ -5,7 +5,7 @@ import {
   inTz, WK, MO,
 } from '../lib/dataUtils';
 import { resolveScore, isMatchFinished, isMatchLive } from '../lib/liveData';
-import { fullResult, narrative, groupStandings, groupResults, headlines } from '../lib/teletextData';
+import { fullResult, narrative, groupStandings, groupResults, qualificationNotes, headlines } from '../lib/teletextData';
 import { resolveTeamCodes } from '../lib/bracketData';
 import type { Match, TZKey, PageId, LiveScore, NewsItem, Headline, TopScorer } from '../lib/types';
 
@@ -328,6 +328,7 @@ export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup
   const g        = focusedGroup || 'Group A';
   const standings = useMemo(() => groupStandings(matches, now, liveScores)[g] ?? [], [matches, now, liveScores, g]);
   const fixtures  = useMemo(() => groupResults(matches, g, now, liveScores), [matches, g, now, liveScores]);
+  const qualNotes = useMemo(() => qualificationNotes(matches, g, now, liveScores), [matches, g, now, liveScores]);
   const letter    = g.replace('Group ', '');
 
   return (
@@ -362,6 +363,15 @@ export function GroupDetailPage({ matches, now, viewer, liveScores, focusedGroup
             );
           })}
         </div>
+
+        {qualNotes.length > 0 && (
+          <div className="gd__qual">
+            <span className="gd__qual__lbl c-g">► TO ADVANCE</span>
+            {qualNotes.map((n, i) => (
+              <span key={i} className={`gd__qual__note gd__qual__note--${n.tone}`}>{n.text}</span>
+            ))}
+          </div>
+        )}
 
         <div className="gd__fix">
           <div className="c-g" style={{ fontSize: 22, marginBottom: 4 }}>► MATCH-BY-MATCH</div>
