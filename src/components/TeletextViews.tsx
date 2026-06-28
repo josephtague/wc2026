@@ -6,6 +6,7 @@ import {
 } from '../lib/dataUtils';
 import { resolveScore, isMatchFinished, isMatchLive } from '../lib/liveData';
 import { fullResult, narrative, groupStandings, groupResults, headlines } from '../lib/teletextData';
+import { resolveTeamCodes } from '../lib/bracketData';
 import type { Match, TZKey, PageId, LiveScore, NewsItem, Headline, TopScorer } from '../lib/types';
 
 // ── Shared props types ─────────────────────────────────────────────────────
@@ -153,7 +154,8 @@ export function FixturesPage({ matches, now, viewer, liveScores, switchPage, set
     () => matches.filter(m => !isMatchFinished(m.num, m.kickoffUTC, now, liveScores)),
     [matches, now, liveScores],
   );
-  return <FixturesOrResults rows={upcoming} viewer={viewer} liveScores={liveScores} showResults={false} now={now}
+  const teamCodes = useMemo(() => resolveTeamCodes(matches, now, liveScores), [matches, now, liveScores]);
+  return <FixturesOrResults rows={upcoming} viewer={viewer} liveScores={liveScores} showResults={false} now={now} teamCodes={teamCodes}
     switchPage={switchPage} setSelectedPreviewNum={setSelectedPreviewNum} setSelectedMatchNum={setSelectedMatchNum} isMobile={isMobile} />;
 }
 
@@ -165,7 +167,8 @@ export function ResultsPage({ matches, now, viewer, liveScores, switchPage, setS
     () => matches.filter(m => isMatchFinished(m.num, m.kickoffUTC, now, liveScores)).slice().reverse(),
     [matches, now, liveScores],
   );
-  return <FixturesOrResults rows={played} viewer={viewer} liveScores={liveScores} showResults now={now}
+  const teamCodes = useMemo(() => resolveTeamCodes(matches, now, liveScores), [matches, now, liveScores]);
+  return <FixturesOrResults rows={played} viewer={viewer} liveScores={liveScores} showResults now={now} teamCodes={teamCodes}
     switchPage={switchPage} setSelectedPreviewNum={setSelectedPreviewNum} setSelectedMatchNum={setSelectedMatchNum} isMobile={isMobile} />;
 }
 
@@ -176,12 +179,13 @@ interface FORProps {
   liveScores: Map<number, LiveScore>;
   showResults: boolean;
   now: number;
+  teamCodes: Map<number, { home: string; away: string }>;
   switchPage: (id: PageId) => void;
   setSelectedPreviewNum: (n: number) => void;
   setSelectedMatchNum: (n: number) => void;
   isMobile: boolean;
 }
-function FixturesOrResults({ rows, viewer, liveScores, showResults, now, switchPage, setSelectedPreviewNum, setSelectedMatchNum, isMobile }: FORProps) {
+function FixturesOrResults({ rows, viewer, liveScores, showResults, now, teamCodes, switchPage, setSelectedPreviewNum, setSelectedMatchNum, isMobile }: FORProps) {
   const days = useMemo(() => {
     const map = new Map<string, { key: string; label: string; matches: Match[] }>();
     rows.forEach(m => {
@@ -205,13 +209,14 @@ function FixturesOrResults({ rows, viewer, liveScores, showResults, now, switchP
     const r          = (showResults && finished) ? resolveScore(m.num, liveScores) : null;
     const cls        = finished ? 'is-result' : live ? 'is-live' : '';
     const vsLabel    = finished ? (r ? `${r.home}–${r.away}` : '—') : live ? 'LIVE' : 'v';
+    const codes      = teamCodes.get(m.num);
     return (
       <div className={`fix__card${cls ? ` ${cls}` : ''}`} key={m.num}>
         <div className="fix__card__time">{t}</div>
         <div className="fix__card__match">
-          <span className="fix__card__home c-w">{m.teams[0].short}</span>
+          <span className="fix__card__home c-w">{codes?.home ?? m.teams[0].short}</span>
           <span className={`fix__card__vs${finished ? ' sc' : ''}`}>{vsLabel}</span>
-          <span className="fix__card__away c-w">{m.teams[1].short}</span>
+          <span className="fix__card__away c-w">{codes?.away ?? m.teams[1].short}</span>
         </div>
         <div className="fix__card__meta">
           {stageShort}{m.city ? ` · ${m.city}` : ''}

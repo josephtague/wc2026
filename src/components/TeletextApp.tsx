@@ -8,6 +8,7 @@ import {
   GroupsPage, GroupDetailPage, MatchReviewPage,
 } from './TeletextViews';
 import { PreviewPage } from './PreviewPage';
+import { BracketPage } from './BracketPage';
 import { groupStandings } from '../lib/teletextData';
 import { scheduleKickoffReminders } from '../lib/notifications';
 
@@ -50,8 +51,15 @@ const PAGES: Record<string, PageConfig> = {
       { c: 'y', label: 'RESULTS',  to: 'results'  },
       { c: 'c', label: 'GROUPS',   to: 'groups'   },
     ] },
+  '170': { id: 'bracket',  no: '170', title: 'BRACKET',  titleColor: 'is-yellow', subRight: 'WORLD CUP 2026',
+    fastext: [
+      { c: 'r', label: 'NEWS',     to: 'news'     },
+      { c: 'g', label: 'FIXTURES', to: 'fixtures' },
+      { c: 'y', label: 'RESULTS',  to: 'results'  },
+      { c: 'c', label: 'GROUPS',   to: 'groups'   },
+    ] },
 };
-const ID_TO_NO: Record<PageId, string> = { news:'100',fixtures:'140',results:'141',groups:'150',groupdet:'151',review:'160',preview:'161' };
+const ID_TO_NO: Record<PageId, string> = { news:'100',fixtures:'140',results:'141',groups:'150',groupdet:'151',review:'160',preview:'161',bracket:'170' };
 
 // ── Main App ───────────────────────────────────────────────────────────────
 export default function TeletextApp() {
@@ -201,6 +209,7 @@ export default function TeletextApp() {
                     {pageId === 'groupdet' && <GroupDetailPage {...pageProps} />}
                     {pageId === 'review'   && <MatchReviewPage {...pageProps} />}
                     {pageId === 'preview'  && <PreviewPage {...pageProps} />}
+                    {pageId === 'bracket'  && <BracketPage {...pageProps} />}
 
                     <FastextBar page={page} switchPage={switchPage} />
                   </div>
@@ -298,7 +307,7 @@ function SubHeader({ pageId, matches, now, focusedGroup, setFocusedGroup, viewer
   if (pageId === 'results')  node = <><span className="em">— FINAL SCORES —</span> MOST RECENT FIRST</>;
   if (pageId === 'groups') {
     const count = Object.keys(groupStandings(matches, now, liveScores)).length;
-    node = <>{count} GROUPS <span className="em">·</span> 48 NATIONS <span className="em">·</span> TOP 2 ADVANCE</>;
+    node = <>{count} GROUPS <span className="em">·</span> TOP 2 ADVANCE <span className="em">·</span> <span className="c-y">P170 BRACKET</span></>;
   }
   if (pageId === 'groupdet') {
     const idx  = ALL_GROUPS_SUB.indexOf(focusedGroup);
@@ -327,6 +336,7 @@ function SubHeader({ pageId, matches, now, focusedGroup, setFocusedGroup, viewer
       </span>
     );
   }
+  if (pageId === 'bracket')  node = <><span className="em">— PATH TO THE FINAL —</span> WINNERS ADVANCE ►</>;
   return <div className="tt__sub">{node}</div>;
 }
 

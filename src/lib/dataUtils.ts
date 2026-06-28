@@ -115,6 +115,22 @@ export function teamShort(name: string): string {
   return cleaned.slice(0, 3).toUpperCase();
 }
 
+/**
+ * Knockout fixtures in the schedule carry placeholder slots, not teams
+ * ("Group A RU", "Match 73 W", "…3rd"). Turn those into compact bracket codes
+ * ("2A", "W73", "3RD") instead of the meaningless "GRO"/"MAT" from teamShort.
+ * Returns null for real team names.
+ */
+export function placeholderShort(name: string): string | null {
+  let m: RegExpExecArray | null;
+  if ((m = /^Group ([A-L]) W$/i.exec(name)))  return `1${m[1]!.toUpperCase()}`;
+  if ((m = /^Group ([A-L]) RU$/i.exec(name))) return `2${m[1]!.toUpperCase()}`;
+  if (/\b3rd\b/i.test(name)) return '3RD';
+  if ((m = /^Match (\d+) W$/i.exec(name)))    return `W${m[1]}`;
+  if ((m = /^Match (\d+) L$/i.exec(name)))    return `L${m[1]}`;
+  return null;
+}
+
 // ── Deterministic fake results ─────────────────────────────────────────────
 export function fakeResult(matchNum: number): FakeResult {
   let s = matchNum * 1103515245 + 12345;
@@ -139,11 +155,10 @@ export async function loadMatches(): Promise<Match[]> {
     const utc = parseToUTC(m.bstDay, m.bstTime);
     const teamsRaw = m.fixture.split(' vs ').map(s => s.trim());
     const stage = STAGES_BY_NAME[m.stage] ?? STAGES_BY_NAME['Group Stage']!;
-    const makeTeam = (name: string): TeamInfo => ({
-      name,
-      short: teamShort(name),
-      placeholder: /^(W|RU|L|3rd|Match )/i.test(name) || (/\d/.test(name) && name.length <= 4),
-    });
+    const makeTeam = (name: string): TeamInfo => {
+      const ph = placeholderShort(name);
+      return { name, short: ph ?? teamShort(name), placeholder: ph !== null };
+    };
     const teams: [TeamInfo, TeamInfo] = [
       makeTeam(teamsRaw[0] ?? ''),
       makeTeam(teamsRaw[1] ?? ''),

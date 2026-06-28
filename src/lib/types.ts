@@ -125,7 +125,7 @@ export interface Headline {
   link?: string;       // external URL (BBC Sport articles only)
 }
 
-export type PageId = 'news' | 'fixtures' | 'results' | 'groups' | 'groupdet' | 'review' | 'preview';
+export type PageId = 'news' | 'fixtures' | 'results' | 'groups' | 'groupdet' | 'review' | 'preview' | 'bracket';
 
 // ── Live data ──────────────────────────────────────────────────────────────
 // football-data.org status values (plus a few extras for safety)
